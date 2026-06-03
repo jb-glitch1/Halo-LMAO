@@ -1,58 +1,104 @@
-// Tiny vector math on plain {x,y,z} objects.
-// Kept dependency-free so the simulation can run in Node (tests) or the browser.
+# LMAO — Lethal Mayhem: Arena Online
 
-export interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
+**The Temu-tier Halo.** A fully in-browser, first-person multiplayer arena shooter built with
+Next.js + React + Three.js + Socket.IO. Host a room, share a 4-letter code, and finish the
+fight.<sup>(knockoff)</sup>
 
-export const v3 = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });
-export const vclone = (a: Vec3): Vec3 => ({ x: a.x, y: a.y, z: a.z });
-export const vadd = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
-export const vsub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
-export const vscale = (a: Vec3, s: number): Vec3 => ({ x: a.x * s, y: a.y * s, z: a.z * s });
-export const vmadd = (a: Vec3, b: Vec3, s: number): Vec3 => ({
-  x: a.x + b.x * s,
-  y: a.y + b.y * s,
-  z: a.z + b.z * s,
-});
-export const vdot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;
-export const vcross = (a: Vec3, b: Vec3): Vec3 => ({
-  x: a.y * b.z - a.z * b.y,
-  y: a.z * b.x - a.x * b.z,
-  z: a.x * b.y - a.y * b.x,
-});
-export const vlen = (a: Vec3): number => Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-export const vlen2 = (a: Vec3): number => a.x * a.x + a.y * a.y + a.z * a.z;
-export const vdist = (a: Vec3, b: Vec3): number => vlen(vsub(a, b));
-export const vdist2 = (a: Vec3, b: Vec3): number => vlen2(vsub(a, b));
-export const vnorm = (a: Vec3): Vec3 => {
-  const l = vlen(a);
-  return l > 1e-9 ? { x: a.x / l, y: a.y / l, z: a.z / l } : { x: 0, y: 0, z: 0 };
-};
-export const vlerp = (a: Vec3, b: Vec3, t: number): Vec3 => ({
-  x: a.x + (b.x - a.x) * t,
-  y: a.y + (b.y - a.y) * t,
-  z: a.z + (b.z - a.z) * t,
-});
+![modes](https://img.shields.io/badge/modes-4-orange) ![weapons](https://img.shields.io/badge/weapons-10-cyan) ![maps](https://img.shields.io/badge/maps-3-green)
 
-// Direction from yaw (around Y, 0 = -Z forward) and pitch (up/down).
-export const dirFromAngles = (yaw: number, pitch: number): Vec3 => {
-  const cp = Math.cos(pitch);
-  return {
-    x: -Math.sin(yaw) * cp,
-    y: Math.sin(pitch),
-    z: -Math.cos(yaw) * cp,
-  };
-};
+---
 
-// Flat (XZ) forward/right basis from yaw — used for WASD movement.
-export const flatForward = (yaw: number): Vec3 => ({ x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) });
-export const flatRight = (yaw: number): Vec3 => ({ x: Math.cos(yaw), y: 0, z: -Math.sin(yaw) });
+## Quick start
 
-export const clamp = (x: number, lo: number, hi: number): number =>
-  x < lo ? lo : x > hi ? hi : x;
-export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
-export const deg = (r: number): number => (r * 180) / Math.PI;
-export const rad = (d: number): number => (d * Math.PI) / 180;
+```bash
+cd lmao
+npm install
+npm run dev        # http://localhost:3000  (custom Next.js + Socket.IO server)
+```
+
+Production:
+
+```bash
+npm run build
+npm start          # honors $PORT (default 3000) and $HOST
+```
+
+> The app runs on a **custom Node server** (`server.js`) that serves the Next.js site *and*
+> the Socket.IO multiplayer relay from the same process. Deploy it anywhere that runs a
+> long-lived Node process (Render, Railway, Fly, a VPS, etc.). `npm start` is all you need.
+
+---
+
+## How to play
+
+Click the arena to lock your mouse. **Esc** releases it.
+
+| Action | Key |
+| --- | --- |
+| Move | `W A S D` |
+| Look / aim | Mouse |
+| Fire | Left mouse |
+| Zoom / scope | Right mouse |
+| Jump | `Space` |
+| Sprint | `Shift` |
+| Crouch | `Ctrl` / `C` |
+| Reload | `R` |
+| Melee | `V` / `F` |
+| Grenade | `G` (swap type `X`) |
+| Swap weapon | `Q` / scroll |
+| Pick up weapon | `E` |
+| Scoreboard | hold `Tab` |
+
+**Shields regenerate** when you stop taking fire; health only returns once shields are full.
+Precision weapons crush once a shield is popped (the blue flash) — go for the head.
+
+### Modes
+- **Slayer** (FFA) · **Team Slayer** (Red vs Blue) · **King of the Hill** · **Oddball**
+
+### Maps
+- **Bargain Gulch** (Blood-Gulch-on-clearance) · **Clearance Warehouse** (CQB) · **Lattice of Disappointment** (vertical)
+
+---
+
+## Multiplayer model
+
+One player **hosts** — their browser runs the authoritative simulation (`game/engine.ts`).
+Everyone else **joins** with a room code; clients stream inputs up and the host broadcasts
+world snapshots back down ~20 Hz. The Node server is a dumb relay (rooms, lobby, message
+shuttling) — it never runs the game. Empty slots fill with bots so a match is never empty.
+
+- **Play vs Bots** runs a host session locally with no socket at all (pure offline).
+- **Host a Room** / **Join a Room** use the Socket.IO relay.
+
+---
+
+## Architecture
+
+```
+server.js                 Custom Next.js server + Socket.IO room relay
+app/                      Next.js App Router — portal, arsenal, how-to-play, about, /play
+components/               Nav, Lobby, GameClient (loop), HUD
+game/                     Framework-free game core (also unit-testable in Node):
+  engine.ts               Authoritative sim: movement, weapons, modes, scoring, medals
+  physics.ts movement.ts  Capsule-vs-world collision, raycasts, shared movement step
+  bots.ts                 LoS bot AI (acquire, strafe, objective roam, skill-scaled aim)
+  maps.ts weapons.ts      Content: 3 arenas, 10 weapons, loadouts, power-ups
+  renderer.ts             Three.js scene, viewmodels, FX (client only)
+  audio.ts                Synthesized Web Audio SFX + announcer (no audio files)
+  input.ts                Pointer lock + client-side movement prediction
+  net.ts                  HostSession / ClientSession / LobbyClient over Socket.IO
+```
+
+The simulation is **pure TypeScript with no DOM/Three dependency**, so it runs identically on
+the host's browser and in headless Node tests. Three.js is code-split into the game chunk and
+never blocks the marketing pages.
+
+---
+
+## Legal
+
+LMAO is an affectionate **parody** and tech demo. Not affiliated with, endorsed by, or
+connected to any existing game, franchise, "Master Chief," "Spartan," energy sword, or halo
+ring. Every name is intentionally goofy and legally distinct.
+
+Built with Next.js, React, Three.js & Socket.IO.
