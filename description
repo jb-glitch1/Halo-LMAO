@@ -1,0 +1,229 @@
+import type { WeaponDef } from "./types";
+
+// The LMAO sandbox. Every weapon is a legally-distinct, suspiciously-cheap
+// version of something you remember fondly.
+
+export const WEAPONS: Record<string, WeaponDef> = {
+  ar: {
+    id: "ar",
+    name: "Assault Rifle (Refurbished)",
+    flavor: "Sold as-is. Some rattle is normal. Fully automatic, mostly.",
+    type: "hitscan",
+    slot: "primary",
+    damage: 8.5,
+    headshotMult: 1.2,
+    rpm: 600,
+    magSize: 32,
+    reserveMax: 224,
+    reloadMs: 1900,
+    spreadDeg: 1.6,
+    movingSpreadDeg: 1.4,
+    range: 70,
+    color: 0xdfe6ee,
+    emptyHint: "*sad click* — reload (R)",
+  },
+  magnum: {
+    id: "magnum",
+    name: "The Pocket Pistol",
+    flavor: "Fits in your pocket. Voids warranty if fired.",
+    type: "hitscan",
+    slot: "sidearm",
+    damage: 22,
+    headshotMult: 2.5,
+    rpm: 270,
+    magSize: 12,
+    reserveMax: 60,
+    reloadMs: 1500,
+    spreadDeg: 0.5,
+    movingSpreadDeg: 1.6,
+    range: 90,
+    zoom: 0.65,
+    color: 0xffe08a,
+  },
+  br: {
+    id: "br",
+    name: "Battle Rifle (3-rd, batteries not incl.)",
+    flavor: "Three-round burst. The fourth round is sold separately.",
+    type: "hitscan",
+    slot: "primary",
+    damage: 13,
+    headshotMult: 2.2,
+    rpm: 135,
+    burst: 3,
+    burstDelayMs: 65,
+    magSize: 36,
+    reserveMax: 108,
+    reloadMs: 2000,
+    spreadDeg: 0.7,
+    movingSpreadDeg: 1.2,
+    range: 110,
+    zoom: 0.55,
+    color: 0xbfeaff,
+  },
+  shotgun: {
+    id: "shotgun",
+    name: "Boomstick (Generic Brand)",
+    flavor: "Hardware-store aisle 7. Hug your enemies.",
+    type: "hitscan",
+    slot: "power",
+    damage: 13,
+    headshotMult: 1.1,
+    rpm: 65,
+    magSize: 6,
+    reserveMax: 24,
+    reloadMs: 600, // per-shell feel (we reload whole mag for simplicity)
+    spreadDeg: 7.5,
+    pellets: 10,
+    range: 16,
+    color: 0xff9d5c,
+    isPower: true,
+  },
+  sniper: {
+    id: "sniper",
+    name: "Long-Distance Relationship Rifle",
+    flavor: "Commitment issues at close range. Devastating from afar.",
+    type: "hitscan",
+    slot: "power",
+    damage: 80,
+    headshotMult: 2.0, // 160 = instakill through full shield+health
+    rpm: 50,
+    magSize: 4,
+    reserveMax: 16,
+    reloadMs: 2600,
+    spreadDeg: 0.05,
+    movingSpreadDeg: 2.5,
+    range: 300,
+    zoom: 0.28,
+    color: 0x9fe7ff,
+    isPower: true,
+  },
+  rocket: {
+    id: "rocket",
+    name: "Generic Boom Tube",
+    flavor: "Some assembly required. Do not aim at feet (we mean it).",
+    type: "projectile",
+    slot: "power",
+    damage: 50, // direct
+    headshotMult: 1,
+    rpm: 50,
+    magSize: 2,
+    reserveMax: 8,
+    reloadMs: 3200,
+    spreadDeg: 0,
+    range: 400,
+    projectileSpeed: 38,
+    projectileGravity: 0,
+    splashRadius: 5.5,
+    splashDamage: 110,
+    color: 0xffd24d,
+    isPower: true,
+  },
+  plasma: {
+    id: "plasma",
+    name: "Knockoff Plasma Pistol",
+    flavor: "Glows an unlicensed shade of teal. Melts shields.",
+    type: "hitscan",
+    slot: "sidearm",
+    damage: 14,
+    headshotMult: 1.1,
+    rpm: 360,
+    magSize: 40,
+    reserveMax: 0, // battery; we treat reserve as battery recharge-less for now
+    reloadMs: 1400,
+    spreadDeg: 1.2,
+    range: 55,
+    shieldMult: 2.4,
+    healthMult: 0.5,
+    color: 0x36e7ff,
+  },
+  needler: {
+    id: "needler",
+    name: "The Pokey Thing",
+    flavor: "Pink. Pointy. Patently questionable. Sticks then sparkles.",
+    type: "projectile",
+    slot: "power",
+    damage: 9,
+    headshotMult: 1,
+    rpm: 540,
+    magSize: 22,
+    reserveMax: 44,
+    reloadMs: 2200,
+    spreadDeg: 1.5,
+    range: 60,
+    projectileSpeed: 30,
+    projectileGravity: 0,
+    homing: 2.2,
+    stickCombine: 7,
+    splashRadius: 3.2,
+    splashDamage: 70,
+    color: 0xff66c4,
+    isPower: true,
+  },
+  sword: {
+    id: "sword",
+    name: "Energy Butterknife",
+    flavor: "Spreads butter and Spartans equally. Lunges when committed.",
+    type: "melee",
+    slot: "power",
+    damage: 200,
+    headshotMult: 1,
+    rpm: 90,
+    magSize: 1,
+    reserveMax: 0,
+    reloadMs: 0,
+    spreadDeg: 0,
+    range: 4.5,
+    meleeRange: 4.2,
+    color: 0x6bb7ff,
+    isPower: true,
+  },
+};
+
+export interface Loadout {
+  id: string;
+  name: string;
+  blurb: string;
+  weapons: [string, string];
+  grenade: "frag" | "plasma";
+}
+
+export const LOADOUTS: Loadout[] = [
+  {
+    id: "recruit",
+    name: "The Starter Pack",
+    blurb: "Assault Rifle + Pocket Pistol. The 'it came in the box' build.",
+    weapons: ["ar", "magnum"],
+    grenade: "frag",
+  },
+  {
+    id: "marksman",
+    name: "The Try-Hard",
+    blurb: "Battle Rifle + Pocket Pistol. For people who say 'spacing'.",
+    weapons: ["br", "magnum"],
+    grenade: "frag",
+  },
+  {
+    id: "gremlin",
+    name: "The Menace",
+    blurb: "Assault Rifle + Knockoff Plasma. Pop shields, ruin days.",
+    weapons: ["ar", "plasma"],
+    grenade: "plasma",
+  },
+  {
+    id: "duelist",
+    name: "The Optimist",
+    blurb: "Battle Rifle + Knockoff Plasma. Two triggers, infinite confidence.",
+    weapons: ["br", "plasma"],
+    grenade: "plasma",
+  },
+];
+
+export function loadoutById(id: string): Loadout {
+  return LOADOUTS.find((l) => l.id === id) || LOADOUTS[0];
+}
+
+export const POWER_WEAPONS = ["shotgun", "sniper", "rocket", "needler", "sword"];
+
+export function weaponDef(id: string): WeaponDef {
+  return WEAPONS[id] || WEAPONS.ar;
+}
