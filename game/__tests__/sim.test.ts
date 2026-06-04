@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine } from "../engine";
 import { MAP_LIST } from "../maps";
+import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
 import * as C from "../constants";
 import type { MatchConfig, PlayerInput } from "../types";
 
@@ -132,6 +133,14 @@ test("wartrolley: board it, drive it, and splatter someone", () => {
   victim.spawnProtectUntil = 0;
   e.stepVehicles(1 / 60, 4600);
   assert.equal(victim.alive, false, "victim in the cart's path should be splattered");
+});
+
+test("sandbox integrity: loadouts reference real weapons; DMR present; safe fallback", () => {
+  assert.ok(WEAPONS["dmr"], "the DMR exists");
+  for (const l of LOADOUTS) {
+    for (const w of l.weapons) assert.ok(WEAPONS[w], `loadout ${l.id} references real weapon ${w}`);
+  }
+  assert.equal(weaponDef("does-not-exist").id, "ar", "unknown weapon falls back to the AR");
 });
 
 test("every map boots players onto solid ground, in bounds, alive", () => {

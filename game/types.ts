@@ -116,6 +116,7 @@ export interface WeaponDef {
   healthMult?: number;
   color: number; // tracer / model accent
   isPower?: boolean;
+  vehicleOnly?: boolean; // mounted weapons — hidden from the arsenal/loadouts
   emptyHint?: string;
 }
 

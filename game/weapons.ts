@@ -60,6 +60,24 @@ export const WEAPONS: Record<string, WeaponDef> = {
     zoom: 0.55,
     color: 0xbfeaff,
   },
+  dmr: {
+    id: "dmr",
+    name: "The Long Receipt",
+    flavor: "One crisp, itemized round per pull. Lethal in trained hands; embarrassing in yours.",
+    type: "hitscan",
+    slot: "primary",
+    damage: 24,
+    headshotMult: 2.3,
+    rpm: 150,
+    magSize: 14,
+    reserveMax: 56,
+    reloadMs: 2100,
+    spreadDeg: 0.35,
+    movingSpreadDeg: 1.7,
+    range: 135,
+    zoom: 0.5,
+    color: 0xc8f0a0,
+  },
   shotgun: {
     id: "shotgun",
     name: "Boomstick (Generic Brand)",
@@ -193,6 +211,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     range: 95,
     color: 0xffa030,
     isPower: true,
+    vehicleOnly: true,
   },
 };
 
@@ -232,6 +251,13 @@ export const LOADOUTS: Loadout[] = [
     blurb: "Battle Rifle + Knockoff Plasma. Two triggers, infinite confidence.",
     weapons: ["br", "plasma"],
     grenade: "plasma",
+  },
+  {
+    id: "itemizer",
+    name: "The Itemizer",
+    blurb: "The Long Receipt + Pocket Pistol. One bullet, fully itemized regret.",
+    weapons: ["dmr", "magnum"],
+    grenade: "frag",
   },
 ];
 

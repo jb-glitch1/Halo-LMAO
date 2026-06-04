@@ -28,14 +28,14 @@ const POWERUPS = [
 ];
 
 export default function Arsenal() {
-  const ids = Object.keys(WEAPONS);
+  const ids = Object.keys(WEAPONS).filter((id) => !WEAPONS[id].vehicleOnly);
   return (
     <main className="min-h-screen grid-bg">
       <Nav />
       <div className="max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-4xl font-extrabold mb-1">The <span className="text-temu-orange">Arsenal</span></h1>
         <p className="text-hud-amber/50 font-mono text-sm mb-8">
-          Ten legally-distinct instruments of value-engineered violence.
+          {ids.length} legally-distinct instruments of value-engineered violence.
         </p>
 
         <div className="grid md:grid-cols-2 gap-4 mb-12">
