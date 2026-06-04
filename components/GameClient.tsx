@@ -41,6 +41,21 @@ function loadSettings(): Record<string, any> {
   }
 }
 
+// Accumulate lifetime stats (the "Loyalty Program") into localStorage at match end.
+function recordCareer(self: PlayerState | undefined, won: boolean) {
+  if (typeof window === "undefined" || !self) return;
+  let c: Record<string, number> = {};
+  try { c = JSON.parse(localStorage.getItem("lmao_career") || "{}"); } catch { c = {}; }
+  c.matches = (c.matches || 0) + 1;
+  c.kills = (c.kills || 0) + self.kills;
+  c.deaths = (c.deaths || 0) + self.deaths;
+  c.wins = (c.wins || 0) + (won ? 1 : 0);
+  c.bestStreak = Math.max(c.bestStreak || 0, self.longestStreak || 0);
+  c.shotsFired = (c.shotsFired || 0) + (self.shotsFired || 0);
+  c.shotsHit = (c.shotsHit || 0) + (self.shotsHit || 0);
+  try { localStorage.setItem("lmao_career", JSON.stringify(c)); } catch { /* noop */ }
+}
+
 export default function GameClient({ session, localId, online, isHost, onLeave, onReturnLobby, onReplay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -405,6 +420,14 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     setEndInfo({ winnerText, roster, useTeams, teamScore: snap.teamScore });
     setEnded(true);
     audio.announce(winnerText);
+
+    // lifetime stats
+    const self = snap.players.find((p) => p.id === localId);
+    let won = false;
+    if (snap.mode === "infection") won = !self?.infected;
+    else if (useTeams) won = !!self && self.team === (snap.teamScore.red > snap.teamScore.blue ? "red" : snap.teamScore.blue > snap.teamScore.red ? "blue" : "none");
+    else won = [...snap.players].sort((a, b) => b.score - a.score)[0]?.id === localId;
+    recordCareer(self, won);
   }, [audio, localId]);
 
   const resume = () => { imRef.current?.requestLock(); };

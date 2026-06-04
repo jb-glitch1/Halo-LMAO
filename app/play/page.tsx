@@ -243,9 +243,42 @@ function PlayInner() {
           </div>
         </div>
 
+        <CareerPanel />
+
         <p className="text-center text-xs text-hud-amber/40 mt-8 font-mono">
           Tip: hosting runs the match in your browser. Keep this tab focused for the smoothest game.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function CareerPanel() {
+  const [c, setC] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("lmao_career") || "null");
+      if (s && s.matches) setC(s);
+    } catch { /* no record yet */ }
+  }, []);
+  if (!c) return null;
+  const kd = c.deaths ? (c.kills / c.deaths).toFixed(2) : (c.kills || 0).toFixed(2);
+  const acc = c.shotsFired ? Math.round((c.shotsHit / c.shotsFired) * 100) : 0;
+  const wr = c.matches ? Math.round((c.wins / c.matches) * 100) : 0;
+  const cells: [string, string | number][] = [
+    ["Matches", c.matches], ["Wins", `${c.wins} (${wr}%)`], ["Kills", c.kills],
+    ["K/D", kd], ["Accuracy", `${acc}%`], ["Best streak", c.bestStreak || 0],
+  ];
+  return (
+    <div className="panel p-5 mt-6">
+      <div className="label mb-3">🪪 Loyalty Program — your lifetime record</div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
+        {cells.map(([l, v]) => (
+          <div key={l}>
+            <div className="text-2xl font-extrabold text-hud-cyan tabular-nums">{v}</div>
+            <div className="label mt-0.5">{l}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
