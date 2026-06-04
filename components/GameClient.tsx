@@ -6,6 +6,7 @@ import { InputManager } from "@/game/input";
 import { getAudio } from "@/game/audio";
 import { weaponDef } from "@/game/weapons";
 import { MAX_SHIELD } from "@/game/constants";
+import { GUN_LADDER } from "@/game/engine";
 import type { SessionLike } from "@/game/net";
 import type { Snapshot, PlayerState } from "@/game/types";
 
@@ -375,6 +376,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
             youCarry: (session.localTeam === "red" ? snap.flags.blue : snap.flags.red).carrier === localId,
           }
         : undefined,
+      gungame: snap.mode === "gungame" ? { level: self?.gunLevel ?? 0, total: GUN_LADDER.length } : undefined,
       damageDir: dmgDir.current && now - dmgDir.current.ts < 1100 ? dmgDir.current.ang : null,
       colorblind: colorblindRef.current,
     };

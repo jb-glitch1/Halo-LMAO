@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Engine } from "../engine";
+import { Engine, GUN_LADDER } from "../engine";
 import "../bots"; // side-effect: registers the bot brain with the engine
 import { MAP_LIST } from "../maps";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
@@ -206,6 +206,27 @@ test("spawning never drops you on top of a living enemy", () => {
     if (Math.hypot(sp.pos.x - target.pos.x, sp.pos.z - target.pos.z) < 0.01) onTop++;
   }
   assert.equal(onTop, 0, "the enemy-occupied spawn is never chosen");
+});
+
+test("gun game: kills climb the weapon ladder and finishing it ends the match", () => {
+  const e = new Engine(cfg({ mode: "gungame" }));
+  e.addPlayer("a", { name: "a", team: "ffa", isBot: false });
+  e.addPlayer("b", { name: "b", team: "ffa", isBot: false });
+  e.start(0);
+  e.step(1 / 60, 4000);
+  const a = e.players.get("a")!;
+  const b = e.players.get("b")!;
+  assert.equal(a.weaponId, GUN_LADDER[0], "starts on the first rung");
+  e.killPlayer(b, a, a.weaponId, false, 4000);
+  assert.equal(a.gunLevel, 1, "a kill climbs one rung");
+  assert.equal(a.weaponId, GUN_LADDER[1], "and immediately hands the next weapon");
+  for (let i = 0; i < GUN_LADDER.length + 2 && e.phase === "live"; i++) {
+    b.alive = true;
+    b.health = 100;
+    b.shield = 0;
+    e.killPlayer(b, a, a.weaponId, false, 4000);
+  }
+  assert.equal(e.phase, "over", "completing the ladder ends the match");
 });
 
 test("ctf: grabbing the enemy banner and carrying it home scores a capture", () => {

@@ -51,6 +51,9 @@ interface FlagRuntime {
   droppedAt: number;
 }
 
+// Gun Game weapon ladder (escalating, finishing on the energy butterknife).
+export const GUN_LADDER = ["magnum", "ar", "br", "dmr", "shotgun", "needler", "plasma", "sniper", "rocket", "sword"];
+
 const emptyInput = (): PlayerInput => ({
   moveX: 0,
   moveZ: 0,
@@ -267,6 +270,7 @@ export class Engine {
       longestStreak: 0,
       shotsFired: 0,
       shotsHit: 0,
+      gunLevel: 0,
       recentDamagers: {},
       carryingOddball: false,
       firing: false,
@@ -335,8 +339,13 @@ export class Engine {
     p.vehicleId = null;
     p.vehicleSeat = undefined;
     p.carryingFlag = null;
-    // loadout — infected get the energy butterknife; survivors their loadout
-    if (this.config.mode === "infection" && p.infected) {
+    // loadout — gun game ladder, infected claws, or the chosen loadout
+    if (this.config.mode === "gungame") {
+      const w = GUN_LADDER[Math.min(p.gunLevel ?? 0, GUN_LADDER.length - 1)];
+      p.weapons = [w];
+      p.weaponId = w;
+      p.grenades = { frag: 1, plasma: 0 };
+    } else if (this.config.mode === "infection" && p.infected) {
       p.weapons = ["sword"];
       p.weaponId = "sword";
       p.grenades = { frag: 0, plasma: 0 };
@@ -404,7 +413,7 @@ export class Engine {
   }
   isEnemy(a: PlayerState, b: PlayerState) {
     if (a.id === b.id) return false;
-    if (this.config.mode === "slayer") return true; // FFA
+    if (this.config.mode === "slayer" || this.config.mode === "gungame") return true; // FFA
     return !this.sameTeam(a.team, b.team);
   }
 
@@ -1115,6 +1124,28 @@ export class Engine {
       this.announce("GRUNT BIRTHDAY PARTY", "🎉 surprise!", true, attacker?.id);
     }
 
+    // ---- gun game: climb the ladder; melee kills demote the victim ----
+    if (this.config.mode === "gungame" && attacker && attacker.id !== victim.id && !this.sameTeam(attacker.team, victim.team)) {
+      if (weaponId === "sword" || weaponId === "melee" || weaponId === "assassin") {
+        victim.gunLevel = Math.max(0, (victim.gunLevel ?? 0) - 1);
+        this.announce("DEMOTED", "knocked down a rung", false, victim.id);
+      }
+      attacker.gunLevel = (attacker.gunLevel ?? 0) + 1;
+      attacker.score = attacker.gunLevel;
+      if (attacker.gunLevel >= GUN_LADDER.length) {
+        this.announce("LADDER COMPLETE", `${attacker.name} cleared the Clearance Ladder`, true);
+        this.endMatch("score");
+      } else {
+        const w = GUN_LADDER[attacker.gunLevel];
+        attacker.weapons = [w];
+        attacker.weaponId = w;
+        this.resetAmmo(attacker);
+        attacker.reloadUntil = 0;
+        attacker.burstLeft = 0;
+        this.announce("LEVEL UP", `→ ${weaponDef(w).name}`, false, attacker.id);
+      }
+    }
+
     // ---- infection: a fallen survivor joins the horde ----
     if (this.config.mode === "infection" && !victim.infected) {
       victim.infected = true;
@@ -1631,6 +1662,7 @@ export class Engine {
         oddball: "ODDBALL — hold the cursed ball",
         infection: "BLACK FRIDAY — survive the doorbuster horde",
         ctf: "CAPTURE THE BANNER — steal theirs, defend yours",
+        gungame: "CLEARANCE LADDER — climb the weapon rack to win",
       } as Record<string, string>
     )[this.config.mode];
   }

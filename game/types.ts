@@ -1,7 +1,7 @@
 import type { Vec3 } from "./vec";
 
 export type Team = "red" | "blue" | "ffa";
-export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection" | "ctf";
+export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection" | "ctf" | "gungame";
 export type SkullId = "thrifty" | "boom" | "birthday" | "famine" | "sugar";
 
 export interface Box {
@@ -214,6 +214,8 @@ export interface PlayerState {
   infected?: boolean;
   // CTF: which team's banner this player is carrying (null = none)
   carryingFlag?: Team | null;
+  // Gun Game: current rung on the weapon ladder
+  gunLevel?: number;
   // vehicle occupancy
   vehicleId?: string | null;
   vehicleSeat?: "driver" | "gunner";

@@ -24,6 +24,7 @@ const MODES = [
   { id: "oddball", name: "Oddball", d: "Hold the ball" },
   { id: "infection", name: "Black Friday", d: "Survive the horde" },
   { id: "ctf", name: "Capture the Banner", d: "Steal their banner" },
+  { id: "gungame", name: "Clearance Ladder", d: "Climb the gun rack" },
 ] as const;
 const SKILLS = [{ v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.78, n: "ODST" }, { v: 0.95, n: "Legendary" }];
 const SKULLS: { id: SkullId; name: string }[] = [
@@ -266,7 +267,7 @@ function SoloSetup({ onStart, onBack, initial }: { onStart: (c: MatchConfig) => 
             <div className="label mb-2">Mode</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {MODES.map((m) => (
-                <button key={m.id} onClick={() => set({ mode: m.id, scoreLimit: m.id === "koth" || m.id === "oddball" ? 120 : m.id === "ctf" ? 3 : 25 })} className={`p-2 rounded-lg border text-center ${cfg.mode === m.id ? "border-temu-orange bg-temu-orange/10" : "border-hud-line"}`}>
+                <button key={m.id} onClick={() => set({ mode: m.id, scoreLimit: m.id === "koth" || m.id === "oddball" ? 120 : m.id === "ctf" ? 3 : m.id === "gungame" ? 10 : 25 })} className={`p-2 rounded-lg border text-center ${cfg.mode === m.id ? "border-temu-orange bg-temu-orange/10" : "border-hud-line"}`}>
                   <div className="text-sm font-bold text-hud-amber">{m.name}</div>
                   <div className="text-[10px] text-hud-amber/50">{m.d}</div>
                 </button>
