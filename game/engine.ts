@@ -253,7 +253,7 @@ export class Engine {
       weaponId: lo.weapons[0],
       weapons: [...lo.weapons],
       ammo: {},
-      grenades: { frag: 2, plasma: lo.grenade === "plasma" ? 2 : 0 },
+      grenades: { frag: 2, plasma: lo.grenade === "plasma" ? 2 : 0, mine: 0 },
       reloadUntil: 0,
       fireReadyAt: 0,
       burstLeft: 0,
@@ -344,11 +344,11 @@ export class Engine {
       const w = GUN_LADDER[Math.min(p.gunLevel ?? 0, GUN_LADDER.length - 1)];
       p.weapons = [w];
       p.weaponId = w;
-      p.grenades = { frag: 1, plasma: 0 };
+      p.grenades = { frag: 1, plasma: 0, mine: 0 };
     } else if (this.config.mode === "infection" && p.infected) {
       p.weapons = ["sword"];
       p.weaponId = "sword";
-      p.grenades = { frag: 0, plasma: 0 };
+      p.grenades = { frag: 0, plasma: 0, mine: 0 };
       p.maxShield = 0;
       p.shield = 0;
       p.health = 150; // tanky melee horde
@@ -357,7 +357,7 @@ export class Engine {
       const lo = loadoutById(this.config.startingLoadout);
       p.weapons = [...lo.weapons];
       p.weaponId = lo.weapons[0];
-      p.grenades = { frag: this.hasSkull("famine") ? 1 : 2, plasma: lo.grenade === "plasma" ? 2 : 1 };
+      p.grenades = { frag: this.hasSkull("famine") ? 1 : 2, plasma: lo.grenade === "plasma" ? 2 : 1, mine: this.hasSkull("famine") ? 0 : 1 };
       if (this.hasSkull("thrifty")) {
         p.maxShield = 0;
         p.shield = 0;
@@ -712,16 +712,19 @@ export class Engine {
     p.grenades[type]--;
     const origin = vadd(this.aimOrigin(p), vscale(dirFromAngles(p.yaw, p.pitch), 0.6));
     const dir = dirFromAngles(p.yaw, p.pitch);
-    const vel = vadd(vscale(dir, C.GRENADE_THROW_SPEED), v3(0, 2.5, 0));
+    const mine = type === "mine";
+    const vel = mine
+      ? vadd(vscale(dir, 9), v3(0, 1.5, 0)) // lob the mine a short way
+      : vadd(vscale(dir, C.GRENADE_THROW_SPEED), v3(0, 2.5, 0));
     this.projectiles.push({
       id: this.nextProjId++,
       owner: p.id,
       team: p.team,
-      weapon: type === "plasma" ? "g_plasma" : "g_frag",
+      weapon: mine ? "g_mine" : type === "plasma" ? "g_plasma" : "g_frag",
       pos: origin,
       vel,
       bornAt: now,
-      life: C.GRENADE_FUSE_MS,
+      life: mine ? 25000 : C.GRENADE_FUSE_MS,
     });
   }
 
@@ -828,17 +831,38 @@ export class Engine {
 
       // grenade fuse / projectile lifetime
       if (isGrenade) {
+        const isMine = pr.weapon === "g_mine";
         if (now - pr.bornAt >= pr.life) {
           this.detonate(pr, pr.pos, null, now);
           continue;
         }
-        // bounce off floor
+        // settle on the floor (mines rest; grenades bounce)
         const ground = supportHeight(pr.pos.x, pr.pos.z, 0.2, pr.pos.y + 0.2, this.map);
         if (pr.pos.y <= ground + 0.18) {
           pr.pos.y = ground + 0.18;
-          pr.vel.y = Math.abs(pr.vel.y) * 0.4;
-          pr.vel.x *= 0.6;
-          pr.vel.z *= 0.6;
+          if (isMine) {
+            pr.vel.x = pr.vel.y = pr.vel.z = 0;
+          } else {
+            pr.vel.y = Math.abs(pr.vel.y) * 0.4;
+            pr.vel.x *= 0.6;
+            pr.vel.z *= 0.6;
+          }
+        }
+        // armed mine: trip on a nearby enemy
+        if (isMine && now - pr.bornAt > 800) {
+          let trip = false;
+          for (const t of this.players.values()) {
+            if (!t.alive || t.id === pr.owner) continue;
+            if (!this.config.friendlyFire && this.sameTeam(pr.team, t.team)) continue;
+            if (vdist(t.pos, pr.pos) < 2.6) {
+              trip = true;
+              break;
+            }
+          }
+          if (trip) {
+            this.detonate(pr, pr.pos, null, now);
+            continue;
+          }
         }
       } else if (now - pr.bornAt >= pr.life) {
         continue; // expire silently
@@ -883,6 +907,11 @@ export class Engine {
     if (pr.weapon === "g_frag") {
       this.pushFx("explosion", point, pr.team, "frag", 1.3);
       this.splash(point, C.FRAG_RADIUS, C.FRAG_DAMAGE, owner, "frag", now);
+      return;
+    }
+    if (pr.weapon === "g_mine") {
+      this.pushFx("explosion", point, pr.team, "frag", 1.15);
+      this.splash(point, C.FRAG_RADIUS * 0.9, C.FRAG_DAMAGE, owner, "frag", now);
       return;
     }
     // rocket

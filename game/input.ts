@@ -13,7 +13,7 @@ export class InputManager {
   fire = false;
   zoomHeld = false;
   locked = false;
-  grenadeType: "frag" | "plasma" = "frag";
+  grenadeType: "frag" | "plasma" | "mine" = "frag";
   private pendingSwap = false;
   private seq = 0;
   private invertY = false;
@@ -71,7 +71,7 @@ export class InputManager {
     if (e.code === "Tab") e.preventDefault();
     if (e.repeat) return;
     this.keys.add(e.code);
-    if (e.code === "KeyX") this.grenadeType = this.grenadeType === "frag" ? "plasma" : "frag";
+    if (e.code === "KeyX") this.grenadeType = this.grenadeType === "frag" ? "plasma" : this.grenadeType === "plasma" ? "mine" : "frag";
     if (e.code === "Escape") this.exitLock();
   };
   private onKeyUp = (e: KeyboardEvent) => {

@@ -768,6 +768,14 @@ export class Renderer {
       const col = weapon === "g_plasma" ? 0x36e7ff : 0x2f6f3f;
       return new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: weapon === "g_plasma" ? 0.9 : 0.2 }));
     }
+    if (weapon === "g_mine") {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.08, 12), new THREE.MeshStandardMaterial({ color: 0x333a44, metalness: 0.6, roughness: 0.4 }));
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+      led.position.y = 0.08;
+      g.add(body, led);
+      return g;
+    }
     return new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
   }
 

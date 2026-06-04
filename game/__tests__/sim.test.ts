@@ -208,6 +208,26 @@ test("spawning never drops you on top of a living enemy", () => {
   assert.equal(onTop, 0, "the enemy-occupied spawn is never chosen");
 });
 
+test("trip mine: arms, then detonates when an enemy steps on it", () => {
+  const e = liveEngine();
+  const a = e.players.get("a")!;
+  const t = e.players.get("b")!;
+  a.pos = { x: 0, y: 0, z: -15 };
+  a.yaw = Math.PI;
+  a.grenades.mine = 1;
+  e.throwGrenade(a, input({ throwGrenade: true, grenadeType: "mine" }), 4000);
+  assert.ok(e.projectiles.some((p) => p.weapon === "g_mine"), "a mine was placed");
+  for (let i = 0; i < 40; i++) e.stepProjectiles(1 / 60, 4000 + i * 16); // let it settle
+  const mine = e.projectiles.find((p) => p.weapon === "g_mine")!;
+  assert.ok(mine, "mine rests on the ground");
+  t.pos = { x: mine.pos.x, y: mine.pos.y, z: mine.pos.z };
+  t.spawnProtectUntil = 0;
+  const before = t.health + t.shield;
+  e.stepProjectiles(1 / 60, 7000); // armed (>800ms) → enemy on it trips it
+  assert.equal(e.projectiles.find((p) => p.weapon === "g_mine"), undefined, "mine detonated");
+  assert.ok(t.health + t.shield < before, "the enemy took blast damage");
+});
+
 test("gun game: kills climb the weapon ladder and finishing it ends the match", () => {
   const e = new Engine(cfg({ mode: "gungame" }));
   e.addPlayer("a", { name: "a", team: "ffa", isBot: false });

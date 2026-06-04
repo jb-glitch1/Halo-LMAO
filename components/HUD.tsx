@@ -18,8 +18,8 @@ export interface HudModel {
   reserve: number;
   reserveInfinite: boolean;
   reloading: number; // 0..1
-  grenades: { frag: number; plasma: number };
-  grenadeType: "frag" | "plasma";
+  grenades: { frag: number; plasma: number; mine: number };
+  grenadeType: "frag" | "plasma" | "mine";
   spread: number;
   zoomed: boolean;
   hitmarker: { active: boolean; headshot: boolean; killed: boolean };
@@ -228,6 +228,7 @@ export default function HUD({ m }: { m: HudModel }) {
           <div className="flex items-center justify-end gap-2 mt-1 text-xs">
             <span className={m.grenadeType === "frag" ? "text-hud-green font-bold" : "text-hud-amber/50"}>🧨 {m.grenades.frag}</span>
             <span className={m.grenadeType === "plasma" ? "text-hud-cyan font-bold" : "text-hud-amber/50"}>🔵 {m.grenades.plasma}</span>
+            <span className={m.grenadeType === "mine" ? "text-temu-orange font-bold" : "text-hud-amber/50"}>💣 {m.grenades.mine}</span>
           </div>
         </div>
         )}

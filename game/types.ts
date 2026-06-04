@@ -154,7 +154,7 @@ export interface PlayerInput {
   altFire: boolean; // melee / zoom toggle depending on context
   reload: boolean;
   throwGrenade: boolean;
-  grenadeType: "frag" | "plasma";
+  grenadeType: "frag" | "plasma" | "mine";
   switchWeapon: number; // -1 none, 0/1 slot, 2 = swap
   zoom: boolean;
   pickup: boolean;
@@ -180,7 +180,7 @@ export interface PlayerState {
   weaponId: string;
   weapons: string[]; // up to 2
   ammo: Record<string, { mag: number; reserve: number }>;
-  grenades: { frag: number; plasma: number };
+  grenades: { frag: number; plasma: number; mine: number };
   reloadUntil: number;
   fireReadyAt: number;
   burstLeft: number;
