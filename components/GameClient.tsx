@@ -69,6 +69,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const medals = useRef<{ id: number; text: string; sub?: string; big?: boolean; ts: number }[]>([]);
   const banner = useRef<{ text: string; sub?: string; ts: number } | null>(null);
   const prevHp = useRef(200);
+  const dmgDir = useRef<{ ang: number; ts: number } | null>(null);
   const fpsRef = useRef({ frames: 0, last: 0, fps: 0 });
   const endedRef = useRef(false);
   const pausedRef = useRef(false);
@@ -237,9 +238,19 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     const ammo = self?.ammo[local.weaponId] || { mag: 0, reserve: 0 };
     const reloading = self && self.reloadUntil > snap.t && def.reloadMs > 0 ? 1 - (self.reloadUntil - snap.t) / def.reloadMs : 0;
 
-    // damage detection
+    // damage detection (sfx + directional indicator)
     const hp = (self?.health ?? 0) + (self?.shield ?? 0);
-    if (self?.alive && hp < prevHp.current - 1) audio.sfx("damage");
+    if (self?.alive && hp < prevHp.current - 1) {
+      audio.sfx("damage");
+      const atk = self.lastAttacker ? snap.players.find((p) => p.id === self.lastAttacker) : undefined;
+      if (atk && atk.id !== localId) {
+        const dx = atk.pos.x - self.pos.x, dz = atk.pos.z - self.pos.z;
+        const cyy = Math.cos(local.yaw), syy = Math.sin(local.yaw);
+        const fwd = -(dx * -syy + dz * -cyy);
+        const rgt = dx * cyy + dz * -syy;
+        dmgDir.current = { ang: Math.atan2(rgt, fwd), ts: now };
+      }
+    }
     prevHp.current = self?.alive ? hp : 200;
 
     // radar
@@ -343,6 +354,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       infection: snap.mode === "infection"
         ? { role: self?.infected ? "infected" : "survivor", survivorsLeft: snap.players.filter((p) => !p.infected).length }
         : undefined,
+      damageDir: dmgDir.current && now - dmgDir.current.ts < 1100 ? dmgDir.current.ang : null,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localId, online, isHost, session, audio]);

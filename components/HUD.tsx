@@ -50,6 +50,7 @@ export interface HudModel {
   connecting?: boolean;
   driving?: { seat: "driver" | "gunner" };
   infection?: { role: "survivor" | "infected"; survivorsLeft: number };
+  damageDir?: number | null; // bearing to last attacker (rad, 0 = ahead), null = hide
 }
 
 const WEAPON_ICON: Record<string, string> = {
@@ -77,6 +78,16 @@ export default function HUD({ m }: { m: HudModel }) {
         <Crosshair spread={m.spread} hit={m.hitmarker} />
       )}
       {m.alive && m.zoomed && <ScopeOverlay />}
+
+      {/* ---- directional damage indicator (red wedge toward the attacker) ---- */}
+      {m.alive && m.damageDir != null && (
+        <div className="absolute top-1/2 left-1/2" style={{ width: 0, height: 0, transform: `translate(-50%,-50%) rotate(${m.damageDir}rad)` }}>
+          <div
+            className="pop"
+            style={{ position: "absolute", left: -22, top: -98, width: 0, height: 0, borderLeft: "22px solid transparent", borderRight: "22px solid transparent", borderBottom: "26px solid rgba(255,55,65,0.72)", filter: "drop-shadow(0 0 6px rgba(255,40,50,0.85))" }}
+          />
+        </div>
+      )}
 
       {/* ---- top center: score / timer ---- */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
