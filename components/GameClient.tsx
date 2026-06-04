@@ -381,7 +381,12 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       for (const p of snap.players) if (!best || p.score > best.score) best = p;
       winnerText = best ? `${best.name.toUpperCase()} WINS` : "NOBODY WINS";
     }
-    const roster: ScoreRow[] = snap.players.map((p) => ({ name: p.name, score: Math.floor(p.score), kills: p.kills, deaths: p.deaths, team: p.team, you: p.id === localId, bot: p.isBot }));
+    const roster: ScoreRow[] = snap.players.map((p) => ({
+      name: p.name, score: Math.floor(p.score), kills: p.kills, deaths: p.deaths, team: p.team,
+      you: p.id === localId, bot: p.isBot,
+      accuracy: p.shotsFired > 0 ? Math.round((p.shotsHit / p.shotsFired) * 100) : 0,
+      bestStreak: p.longestStreak,
+    }));
     setEndInfo({ winnerText, roster, useTeams, teamScore: snap.teamScore });
     setEnded(true);
     audio.announce(winnerText);
@@ -506,12 +511,12 @@ function ResultsTable({ info, localId }: { info: { roster: ScoreRow[]; useTeams:
           <span className="text-hud-blue">BLUE {info.teamScore.blue}</span>
         </div>
       )}
-      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 text-xs text-hud-amber/50 mb-1 px-2 font-mono uppercase tracking-wider">
-        <span>Player</span><span>Score</span><span>Kills</span><span>Deaths</span><span>K/D</span>
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-x-4 text-xs text-hud-amber/50 mb-1 px-2 font-mono uppercase tracking-wider">
+        <span>Player</span><span>Score</span><span>Kills</span><span>Deaths</span><span>K/D</span><span>Acc</span><span title="best streak">🔥</span>
       </div>
       <div className="max-h-[40vh] overflow-auto">
         {rows.map((r, i) => (
-          <div key={i} className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-2 py-1.5 rounded tabular-nums ${r.you ? "bg-hud-amber/10 border border-hud-amber/20" : i % 2 ? "bg-black/20" : ""}`}>
+          <div key={i} className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-x-4 px-2 py-1.5 rounded tabular-nums ${r.you ? "bg-hud-amber/10 border border-hud-amber/20" : i % 2 ? "bg-black/20" : ""}`}>
             <span className="truncate flex items-center gap-1">
               {i === 0 && <span>👑</span>}
               {r.bot && <span className="text-hud-amber/30">🤖</span>}
@@ -522,6 +527,8 @@ function ResultsTable({ info, localId }: { info: { roster: ScoreRow[]; useTeams:
             <span className="text-hud-green">{r.kills}</span>
             <span className="text-temu-red/80">{r.deaths}</span>
             <span className="text-hud-amber/60">{r.deaths ? (r.kills / r.deaths).toFixed(1) : r.kills.toFixed(1)}</span>
+            <span className="text-hud-blue">{r.accuracy ?? 0}%</span>
+            <span className="text-temu-gold">{r.bestStreak ?? 0}</span>
           </div>
         ))}
       </div>

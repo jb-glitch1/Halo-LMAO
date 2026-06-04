@@ -144,6 +144,24 @@ test("sandbox integrity: loadouts reference real weapons; DMR present; safe fall
   assert.equal(weaponDef("does-not-exist").id, "ar", "unknown weapon falls back to the AR");
 });
 
+test("carnage report: accuracy and longest streak are tracked", () => {
+  const e = liveEngine();
+  const a = e.players.get("a")!;
+  const t = e.players.get("b")!;
+  // open field on Gulch (away from the central rock mound), 4m apart
+  a.pos = { x: 0, y: 0, z: -15 };
+  t.pos = { x: 0, y: 0, z: -11 }; // 4m directly ahead (yaw = π faces +z)
+  a.yaw = Math.PI;
+  a.pitch = 0;
+  a.grounded = true;
+  a.moving = false;
+  e.fireOneHitscan(a, undefined, 4000);
+  assert.equal(a.shotsFired, 1);
+  assert.equal(a.shotsHit, 1, "a point-blank shot at an enemy counts as a hit");
+  e.killPlayer(t, a, "ar", false, 4000);
+  assert.equal(a.longestStreak, 1);
+});
+
 test("bots board and drive an idle Wartrolley", () => {
   const e = new Engine(cfg({ mapId: "gulch" }));
   e.addPlayer("bot", { name: "bot", team: "ffa", isBot: true });

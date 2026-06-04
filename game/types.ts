@@ -190,6 +190,9 @@ export interface PlayerState {
   assists: number;
   score: number; // mode score (kills, hill time, etc.)
   streak: number;
+  longestStreak: number;
+  shotsFired: number;
+  shotsHit: number;
   // bookkeeping
   lastAttacker?: string;
   recentDamagers: Record<string, number>; // id -> last time, for assists

@@ -4,7 +4,7 @@ import React from "react";
 export interface RadarBlip { x: number; y: number; enemy: boolean; up: boolean; down: boolean; }
 export interface KillRow { id: number; killer: string; victim: string; weapon: string; headshot: boolean; medal?: string; mine: boolean; killerColor: string; victimColor: string; }
 export interface MedalPop { id: number; text: string; sub?: string; big?: boolean; }
-export interface ScoreRow { name: string; score: number; kills: number; deaths: number; team: string; you: boolean; bot: boolean; }
+export interface ScoreRow { name: string; score: number; kills: number; deaths: number; team: string; you: boolean; bot: boolean; accuracy?: number; bestStreak?: number; }
 
 export interface HudModel {
   alive: boolean;

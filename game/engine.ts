@@ -237,6 +237,9 @@ export class Engine {
       assists: 0,
       score: 0,
       streak: 0,
+      longestStreak: 0,
+      shotsFired: 0,
+      shotsHit: 0,
       recentDamagers: {},
       carryingOddball: false,
       firing: false,
@@ -578,13 +581,16 @@ export class Engine {
     const spread = d.spreadDeg + (p.zoomed ? 0 : moving) + (p.grounded ? 0 : d.spreadDeg);
     const pellets = d.pellets || 1;
     this.pushFx("muzzle", origin, p.team, d.id);
+    p.shotsFired++;
+    let hitAny = false;
     for (let i = 0; i < pellets; i++) {
       const dir = this.aimDir(p, pellets > 1 ? d.spreadDeg : spread);
-      this.resolveHitscanRay(p, d, origin, dir, now);
+      hitAny = this.resolveHitscanRay(p, d, origin, dir, now) || hitAny;
     }
+    if (hitAny) p.shotsHit++;
   }
 
-  resolveHitscanRay(p: PlayerState, d = weaponDef(p.weaponId), origin: Vec3, dir: Vec3, now = this.now) {
+  resolveHitscanRay(p: PlayerState, d = weaponDef(p.weaponId), origin: Vec3, dir: Vec3, now = this.now): boolean {
     const wall = raycastWorld(origin, dir, d.range, this.map);
     const wallDist = wall ? wall.t : d.range;
     let hitP: PlayerState | null = null;
@@ -622,12 +628,14 @@ export class Engine {
     } else if (wall) {
       this.pushFx("impact", end, undefined, d.id);
     }
+    return !!hitP;
   }
 
   fireProjectileWeapon(p: PlayerState, d = weaponDef(p.weaponId), now = this.now) {
     const a = p.ammo[p.weaponId];
     if (!a || a.mag <= 0) return;
     a.mag--;
+    p.shotsFired++;
     p.lastFireAt = now;
     const origin = vadd(this.aimOrigin(p), vscale(dirFromAngles(p.yaw, p.pitch), 0.6));
     const dir = this.aimDir(p, d.spreadDeg);
@@ -793,6 +801,7 @@ export class Engine {
 
   detonate(pr: ProjectileState, point: Vec3, direct: PlayerState | null, now: number) {
     const owner = this.players.get(pr.owner);
+    if (direct && owner && direct.id !== owner.id) owner.shotsHit++;
     if (pr.weapon === "needler") {
       // stick & supercombine
       if (direct) {
@@ -985,6 +994,7 @@ export class Engine {
     if (attacker && !suicide && !betrayal) {
       attacker.kills++;
       attacker.streak++;
+      attacker.longestStreak = Math.max(attacker.longestStreak, attacker.streak);
       if (this.config.mode === "slayer" || this.config.mode === "team") {
         attacker.score++;
         if (this.config.mode === "team") this.teamScore[attacker.team as "red" | "blue"]++;
