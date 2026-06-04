@@ -328,7 +328,9 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     imRef.current?.exitLock();
     const useTeams = snap.mode !== "slayer" && snap.players.some((p) => p.team === "red");
     let winnerText = "MATCH OVER";
-    if (useTeams) {
+    if (snap.mode === "infection") {
+      winnerText = snap.players.some((p) => !p.infected) ? "SURVIVORS WIN" : "THE HORDE WINS";
+    } else if (useTeams) {
       winnerText = snap.teamScore.red === snap.teamScore.blue ? "IT'S A DRAW" : snap.teamScore.red > snap.teamScore.blue ? "RED TEAM WINS" : "BLUE TEAM WINS";
     } else {
       let best: PlayerState | null = null;

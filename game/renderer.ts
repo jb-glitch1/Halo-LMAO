@@ -40,6 +40,37 @@ function skyZenith(map: MapDef): number {
   return 0x0a0618; // space void
 }
 
+// Final-pass "budget CRT" grade: film grain, faint scanlines, edge chromatic
+// aberration, and a soft vignette. Cheap, and very on-brand for a knockoff.
+const GrainShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uTime: { value: 0 },
+    uAmount: { value: 0.05 },
+    uScan: { value: 0.05 },
+  },
+  vertexShader:
+    "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
+  fragmentShader: [
+    "uniform sampler2D tDiffuse; uniform float uTime; uniform float uAmount; uniform float uScan;",
+    "varying vec2 vUv;",
+    "float rand(vec2 c){ return fract(sin(dot(c, vec2(12.9898,78.233))) * 43758.5453); }",
+    "void main(){",
+    "  vec2 uv = vUv; vec2 d = uv - 0.5;",
+    "  float ca = 0.0016 * dot(d,d) * 4.0;",
+    "  vec3 col;",
+    "  col.r = texture2D(tDiffuse, uv + d*ca).r;",
+    "  col.g = texture2D(tDiffuse, uv).g;",
+    "  col.b = texture2D(tDiffuse, uv - d*ca).b;",
+    "  float g = rand(uv * vec2(1280.0,720.0) + fract(uTime)) - 0.5;",
+    "  col += g * uAmount;",
+    "  col *= 1.0 - uScan * (0.5 + 0.5*sin(uv.y * 1300.0));",
+    "  col *= smoothstep(1.12, 0.42, length(d)*1.4);",
+    "  gl_FragColor = vec4(col, 1.0);",
+    "}",
+  ].join("\n"),
+};
+
 export interface LocalRender {
   pos: { x: number; y: number; z: number };
   yaw: number;
@@ -117,9 +148,11 @@ export class Renderer {
   composer?: EffectComposer;
   bloomPass?: UnrealBloomPass;
   fxaaPass?: ShaderPass;
+  grainPass?: ShaderPass;
   skyMesh?: THREE.Mesh;
   ringMesh?: THREE.Mesh;
   stars?: THREE.Points;
+  dust?: THREE.Points;
   private blobTex?: THREE.Texture;
 
   constructor(canvas: HTMLCanvasElement, quality: GraphicsQuality = "high") {
@@ -155,9 +188,12 @@ export class Renderer {
     const fxaa = new ShaderPass(FXAAShader); // composer disables MSAA, so AA in a pass
     composer.addPass(fxaa);
     composer.addPass(new OutputPass()); // tone-map + sRGB for the whole frame
+    const grain = new ShaderPass(GrainShader); // budget-CRT grade on the final image
+    composer.addPass(grain);
     this.composer = composer;
     this.bloomPass = bloom;
     this.fxaaPass = fxaa;
+    this.grainPass = grain;
   }
 
   setQuality(q: GraphicsQuality) {
@@ -208,6 +244,29 @@ export class Renderer {
     ring.rotation.set(1.22, 0.35, 0.2);
     ring.renderOrder = -1;
     return ring;
+  }
+
+  private makeDust(map: MapDef): THREE.Points {
+    const n = QUALITY[this.quality].post ? 300 : 130;
+    const arr = new Float32Array(n * 3);
+    const s = map.size;
+    for (let i = 0; i < n; i++) {
+      arr[i * 3] = (Math.random() * 2 - 1) * s;
+      arr[i * 3 + 1] = Math.random() * s * 0.5 + 0.5;
+      arr[i * 3 + 2] = (Math.random() * 2 - 1) * s;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0xfff0d0,
+      size: 0.07,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+    });
+    return new THREE.Points(geo, mat);
   }
 
   private makeStars(count: number): THREE.Points {
@@ -288,6 +347,14 @@ export class Renderer {
     } else {
       this.stars = undefined;
     }
+
+    // ambient dust motes for depth + atmosphere
+    this.dust = this.makeDust(map);
+    this.worldGroup.add(this.dust);
+
+    // per-map color grade
+    this.renderer.toneMappingExposure = map.id === "gulch" ? 1.22 : map.id === "warehouse" ? 1.06 : 1.12;
+    if (this.bloomPass) this.bloomPass.strength = QUALITY[this.quality].bloom * (map.id === "lattice" ? 1.25 : 1);
 
     // ----- lighting: warm key sun + cool sky fill + cool rim -----
     const hemi = new THREE.HemisphereLight(0xeaf4ff, map.ambient, 0.95);
@@ -479,7 +546,7 @@ export class Renderer {
     let v = this.players.get(p.id);
     if (v) return v;
     const group = new THREE.Group();
-    const teamHex = TEAM_HEX[p.team] ?? 0xcccccc;
+    const teamHex = p.infected ? 0x67e36a : TEAM_HEX[p.team] ?? 0xcccccc;
     const armorMat = new THREE.MeshStandardMaterial({ color: teamHex, metalness: 0.5, roughness: 0.42 });
     const darkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(teamHex).multiplyScalar(0.45), metalness: 0.55, roughness: 0.4 });
     // torso + chest plate
@@ -853,6 +920,32 @@ export class Renderer {
         this.fx.push({ obj: m, born: now, life: 300, update: (k) => { m.position.y = f.pos.y + 1 + k * 2; (m.material as THREE.Material).opacity = 0.6 * (1 - k); } });
         break;
       }
+      case "splatter": {
+        const grp = new THREE.Group();
+        for (let i = 0; i < 12; i++) {
+          const s = new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 5), new THREE.MeshBasicMaterial({ color: 0xc0202a, transparent: true }));
+          (s as any).vel = new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 3.5, (Math.random() - 0.5) * 5);
+          grp.add(s);
+        }
+        grp.position.set(f.pos.x, f.pos.y, f.pos.z);
+        this.scene.add(grp);
+        this.fx.push({ obj: grp, born: now, life: 520, update: (k, dt) => { grp.children.forEach((c) => { const v = (c as any).vel as THREE.Vector3; v.y -= 11 * dt; c.position.addScaledVector(v, dt); (((c as THREE.Mesh).material) as THREE.Material).opacity = 1 - k; }); } });
+        break;
+      }
+      case "confetti": {
+        const cols = [0xff5e5e, 0x5dff9b, 0x36e7ff, 0xffd23f, 0xb06bff];
+        const grp = new THREE.Group();
+        for (let i = 0; i < 18; i++) {
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.1), new THREE.MeshBasicMaterial({ color: cols[i % cols.length], transparent: true, side: THREE.DoubleSide }));
+          (m as any).vel = new THREE.Vector3((Math.random() - 0.5) * 3.5, 2 + Math.random() * 3, (Math.random() - 0.5) * 3.5);
+          (m as any).spin = new THREE.Vector3(Math.random() * 7, Math.random() * 7, Math.random() * 7);
+          grp.add(m);
+        }
+        grp.position.set(f.pos.x, f.pos.y, f.pos.z);
+        this.scene.add(grp);
+        this.fx.push({ obj: grp, born: now, life: 1300, update: (k, dt) => { grp.children.forEach((c) => { const v = (c as any).vel as THREE.Vector3; v.y -= 6 * dt; c.position.addScaledVector(v, dt); const sp = (c as any).spin as THREE.Vector3; c.rotation.x += sp.x * dt; c.rotation.y += sp.y * dt; (((c as THREE.Mesh).material) as THREE.Material).opacity = 1 - k; }); } });
+        break;
+      }
     }
   }
 
@@ -942,6 +1035,11 @@ export class Renderer {
 
     this.updateFx(now, dt);
     if (this.ringMesh) this.ringMesh.rotation.z += dt * 0.004;
+    if (this.dust) {
+      this.dust.rotation.y += dt * 0.015;
+      this.dust.position.y = Math.sin(now / 3500) * 0.4;
+    }
+    if (this.grainPass) this.grainPass.uniforms["uTime"].value = now / 1000;
     if (this.composer && this.usePost) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }

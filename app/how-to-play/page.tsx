@@ -17,6 +17,7 @@ const CONTROLS = [
   ["Swap Grenade", "X"],
   ["Swap Weapon", "Q / Scroll"],
   ["Pick Up Weapon", "E"],
+  ["Drive Wartrolley", "E (near a cart)"],
   ["Scoreboard", "Tab (hold)"],
   ["Pause / Unlock", "Esc"],
 ];
@@ -72,6 +73,24 @@ export default function HowToPlay() {
                 the Energy Butterknife spawn on the map on a timer — grab them with <kbd className="font-mono text-hud-cyan">E</kbd>.
                 Controlling power weapons wins matches. So does grabbing the Overshield before the other team does.
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel p-5 mb-10">
+          <h2 className="text-xl font-bold text-hud-amber mb-4">🆕 Drive, survive &amp; find the skull</h2>
+          <div className="grid sm:grid-cols-3 gap-4 text-sm">
+            <div className="border-l-2 border-temu-orange/60 pl-3">
+              <div className="font-semibold text-temu-gold">🛒 The Wartrolley</div>
+              <p className="text-xs text-hud-amber/60 mt-1">Walk up to the shopping-cart &apos;hog on Bargain Gulch and press <kbd className="font-mono text-hud-cyan">E</kbd>. <span className="text-hud-amber/80">WASD</span> drives, the mouse aims the cannon, and running people over at speed splatters them. Press <kbd className="font-mono text-hud-cyan">E</kbd> again to hop out.</p>
+            </div>
+            <div className="border-l-2 border-hud-green/60 pl-3">
+              <div className="font-semibold text-hud-green">🧟 Black Friday</div>
+              <p className="text-xs text-hud-amber/60 mt-1">An Infection mode: melee &quot;doorbusters&quot; (green) hunt armed shoppers. Get caught and you join the horde. Last shopper standing — or the clock — decides it.</p>
+            </div>
+            <div className="border-l-2 border-temu-gold/60 pl-3">
+              <div className="font-semibold text-temu-gold">💀 Skulls</div>
+              <p className="text-xs text-hud-amber/60 mt-1">Toggle chaos modifiers in the bot-match setup, or find the hidden skull on each map mid-game to roll a random one (Markdown Mayhem, Birthday Party, Sugar Rush…).</p>
             </div>
           </div>
         </div>
