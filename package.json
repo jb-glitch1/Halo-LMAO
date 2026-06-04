@@ -7,7 +7,8 @@
     "dev": "node server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --import tsx --test game/__tests__/*.test.ts"
   },
   "dependencies": {
     "next": "14.2.5",
@@ -25,6 +26,7 @@
     "autoprefixer": "10.4.19",
     "postcss": "8.4.39",
     "tailwindcss": "3.4.6",
+    "tsx": "^4.22.4",
     "typescript": "5.5.3"
   }
 }
