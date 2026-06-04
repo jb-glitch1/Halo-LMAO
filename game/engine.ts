@@ -18,7 +18,7 @@ import type {
 import * as C from "./constants";
 import { weaponDef, loadoutById, POWER_WEAPONS } from "./weapons";
 import { getMap } from "./maps";
-import { raycastWorld, rayCylinder, supportHeight } from "./physics";
+import { raycastWorld, rayCylinder, supportHeight, moveAndCollide } from "./physics";
 import { applyMovementStep } from "./movement";
 import {
   Vec3,
@@ -245,6 +245,10 @@ export class Engine {
 
   removePlayer(id: string) {
     if (this.oddballCarrier === id) this.dropOddball(this.players.get(id));
+    for (const v of this.vehicles) {
+      if (v.driver === id) v.driver = null;
+      if (v.gunner === id) v.gunner = null;
+    }
     this.players.delete(id);
     this.inputs.delete(id);
     this.prevInputs.delete(id);
@@ -380,6 +384,15 @@ export class Engine {
         p.yaw = input.yaw;
         p.pitch = clamp(input.pitch, -1.5, 1.5);
       }
+      // enter / exit a Wartrolley with E
+      this.handleVehicleEntry(p, input, prev, now);
+      if (p.vehicleId) {
+        // riding: movement + cannon handled in stepVehicles
+        this.regen(p, dt, now);
+        this.expirePowerups(p, now);
+        this.prevInputs.set(p.id, input);
+        continue;
+      }
       this.applyMovement(p, input, dt, now);
       this.regen(p, dt, now);
       this.handleWeapons(p, input, prev, now);
@@ -390,6 +403,7 @@ export class Engine {
       this.prevInputs.set(p.id, input);
     }
 
+    this.stepVehicles(dt, now);
     this.stepProjectiles(dt, now);
     this.stepPickups(now);
     this.cleanNeedles(now);
@@ -941,6 +955,15 @@ export class Engine {
     victim.streak = 0;
     this.needleStacks.delete(victim.id);
     this.dropOddball(victim);
+    if (victim.vehicleId) {
+      const ve = this.vehicles.find((x) => x.id === victim.vehicleId);
+      if (ve) {
+        if (ve.driver === victim.id) ve.driver = null;
+        if (ve.gunner === victim.id) ve.gunner = null;
+      }
+      victim.vehicleId = null;
+      victim.vehicleSeat = undefined;
+    }
     this.pushFx("death", vadd(victim.pos, v3(0, 0.8, 0)), victim.team);
 
     const betrayal =
@@ -983,6 +1006,7 @@ export class Engine {
       else if (wd.id === "sniper" && headshot) medals.push("Sharpshooter (clearance)");
       else if (headshot) medals.push("Headshot");
       else if (wd.id === "shotgun") medals.push("Hug Specialist");
+      else if (weaponId === "splatter") medals.push("Road Rage (clearance)");
       else if (weaponId.startsWith("rocket")) medals.push("Boom Tube Bargain");
       else if (weaponId === "needler_combine") medals.push("Pink Mist (off-brand)");
       else if (weaponId.startsWith("plasma") || weaponId === "frag") medals.push("Discount Demolition");
@@ -1157,6 +1181,149 @@ export class Engine {
       this.oddballPos = vadd(p.pos, v3(0, 1, 0));
       p.carryingOddball = false;
     }
+  }
+
+  // ---------------- vehicles (Wartrolley) ----------------
+  handleVehicleEntry(p: PlayerState, input: PlayerInput, prev: PlayerInput, now: number) {
+    if (p.isBot) return; // carts are a human toy in v1
+    if (!input.pickup || prev.pickup) return; // rising edge of E
+    if (p.vehicleId) {
+      const v = this.vehicles.find((x) => x.id === p.vehicleId);
+      if (v) {
+        if (v.driver === p.id) v.driver = null;
+        if (v.gunner === p.id) v.gunner = null;
+        const side = flatRight(v.yaw);
+        p.pos = {
+          x: v.pos.x + side.x * (C.VEHICLE_RADIUS + 0.9),
+          y: v.pos.y,
+          z: v.pos.z + side.z * (C.VEHICLE_RADIUS + 0.9),
+        };
+        p.pos.y = supportHeight(p.pos.x, p.pos.z, C.PLAYER_RADIUS, p.pos.y + 0.6, this.map);
+        p.vel = v3();
+      }
+      p.vehicleId = null;
+      p.vehicleSeat = undefined;
+      return;
+    }
+    // board the nearest cart with a free seat
+    let best: VehicleState | null = null;
+    let bestD = 3.4;
+    for (const v of this.vehicles) {
+      if (v.driver && v.gunner) continue;
+      const d = Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z);
+      if (d < bestD) {
+        best = v;
+        bestD = d;
+      }
+    }
+    if (!best) return;
+    if (!best.driver) {
+      best.driver = p.id;
+      p.vehicleSeat = "driver";
+    } else {
+      best.gunner = p.id;
+      p.vehicleSeat = "gunner";
+    }
+    p.vehicleId = best.id;
+  }
+
+  stepVehicles(dt: number, now: number) {
+    for (const v of this.vehicles) {
+      // detach dead / stale occupants
+      const dCheck = v.driver ? this.players.get(v.driver) : null;
+      if (v.driver && (!dCheck || !dCheck.alive || dCheck.vehicleId !== v.id)) v.driver = null;
+      const gCheck = v.gunner ? this.players.get(v.gunner) : null;
+      if (v.gunner && (!gCheck || !gCheck.alive || gCheck.vehicleId !== v.id)) v.gunner = null;
+
+      const drv = v.driver ? this.players.get(v.driver) || null : null;
+
+      // ---- drive ----
+      const fwd = flatForward(v.yaw);
+      let throttle = 0;
+      let steer = 0;
+      if (drv) {
+        const di = this.inputs.get(drv.id) || emptyInput();
+        throttle = clamp(di.moveZ, -1, 1);
+        steer = clamp(di.moveX, -1, 1);
+      }
+      const speed = Math.hypot(v.vel.x, v.vel.z);
+      // steering scales with speed (a parked cart barely turns); reversed in reverse
+      v.yaw -= steer * C.VEHICLE_TURN_RATE * dt * clamp(speed / 6, 0.12, 1.2) * (throttle < -0.1 ? -1 : 1);
+      if (throttle !== 0) {
+        const accel = C.VEHICLE_ACCEL * throttle;
+        v.vel.x += fwd.x * accel * dt;
+        v.vel.z += fwd.z * accel * dt;
+      } else {
+        const f = Math.max(0, 1 - C.VEHICLE_FRICTION * dt);
+        v.vel.x *= f;
+        v.vel.z *= f;
+      }
+      const sp = Math.hypot(v.vel.x, v.vel.z);
+      const cap = throttle < 0 ? C.VEHICLE_REVERSE_SPEED : C.VEHICLE_MAX_SPEED;
+      if (sp > cap) {
+        v.vel.x = (v.vel.x / sp) * cap;
+        v.vel.z = (v.vel.z / sp) * cap;
+      }
+      v.vel.y -= C.GRAVITY * dt;
+      moveAndCollide(v.pos, v.vel, C.VEHICLE_RADIUS, C.VEHICLE_HEIGHT, dt, this.map);
+      const lim = this.map.size - 1.2;
+      v.pos.x = clamp(v.pos.x, -lim, lim);
+      v.pos.z = clamp(v.pos.z, -lim, lim);
+      v.wheelSpin += (throttle >= 0 ? 1 : -1) * Math.hypot(v.vel.x, v.vel.z) * dt * 2;
+
+      // ---- splatter anyone in the way at speed ----
+      if (Math.hypot(v.vel.x, v.vel.z) > C.VEHICLE_SPLATTER_SPEED) {
+        const reach = (C.VEHICLE_RADIUS + C.PLAYER_RADIUS) ** 2;
+        for (const t of this.players.values()) {
+          if (!t.alive || t.vehicleId === v.id) continue;
+          if (now < t.spawnProtectUntil) continue;
+          if (Math.abs(t.pos.y - v.pos.y) > 2) continue;
+          const dx = t.pos.x - v.pos.x;
+          const dz = t.pos.z - v.pos.z;
+          if (dx * dx + dz * dz < reach) {
+            if (drv && !this.isEnemy(drv, t) && !this.config.friendlyFire) continue;
+            this.pushFx("splatter", vadd(t.pos, v3(0, 0.8, 0)), drv?.team);
+            this.applyDamage(t, 9999, drv || undefined, "splatter", false, now);
+          }
+        }
+      }
+
+      // ---- seat occupants + cannon ----
+      this.seatOccupant(v, v.driver, "driver");
+      this.seatOccupant(v, v.gunner, "gunner");
+      for (const shooterId of [v.driver, v.gunner]) {
+        if (!shooterId) continue;
+        const s = this.players.get(shooterId);
+        if (!s) continue;
+        const si = this.inputs.get(s.id) || emptyInput();
+        if (si.fire && now >= v.fireReadyAt) {
+          this.fireVehicleCannon(v, s, now);
+          v.fireReadyAt = now + 60000 / C.VEHICLE_CANNON_RPM;
+        }
+        s.firing = si.fire;
+      }
+    }
+  }
+
+  private seatOccupant(v: VehicleState, id: string | null, seat: "driver" | "gunner") {
+    if (!id) return;
+    const p = this.players.get(id);
+    if (!p || !p.alive) return;
+    const back = seat === "gunner" ? -1 : 0.2;
+    const fwd = flatForward(v.yaw);
+    p.pos = { x: v.pos.x + fwd.x * back, y: v.pos.y, z: v.pos.z + fwd.z * back };
+    p.vel = { ...v.vel };
+    p.grounded = true;
+    p.moving = Math.hypot(v.vel.x, v.vel.z) > 0.6;
+  }
+
+  private fireVehicleCannon(v: VehicleState, shooter: PlayerState, now: number) {
+    const d = weaponDef("turret");
+    const eye = v3(shooter.pos.x, shooter.pos.y + C.VEHICLE_SEAT_EYE, shooter.pos.z);
+    const origin = vadd(eye, vscale(dirFromAngles(shooter.yaw, shooter.pitch), 1.2));
+    this.pushFx("muzzle", origin, shooter.team, "turret");
+    this.resolveHitscanRay(shooter, d, origin, this.aimDir(shooter, d.spreadDeg), now);
+    shooter.lastFireAt = now;
   }
 
   // ---------------- modes ----------------

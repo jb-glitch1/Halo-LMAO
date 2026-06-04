@@ -177,6 +177,23 @@ export const WEAPONS: Record<string, WeaponDef> = {
     color: 0x6bb7ff,
     isPower: true,
   },
+  turret: {
+    id: "turret",
+    name: "Trolley Cannon",
+    flavor: "Cart-mounted. Fires clearance-grade tungsten at alarming cadence.",
+    type: "hitscan",
+    slot: "power",
+    damage: 17,
+    headshotMult: 1.3,
+    rpm: 480,
+    magSize: 9999,
+    reserveMax: 0,
+    reloadMs: 0,
+    spreadDeg: 1.3,
+    range: 95,
+    color: 0xffa030,
+    isPower: true,
+  },
 };
 
 export interface Loadout {

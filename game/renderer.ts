@@ -5,7 +5,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
-import type { MapDef, Snapshot, PlayerState, Team, FxEvent } from "./types";
+import type { MapDef, Snapshot, PlayerState, Team, FxEvent, VehicleState } from "./types";
 import { weaponDef } from "./weapons";
 import * as C from "./constants";
 import { TEAM_COLOR } from "./constants";
@@ -50,6 +50,7 @@ export interface LocalRender {
   alive: boolean;
   firing: boolean;
   team: Team;
+  inVehicle?: boolean;
 }
 
 interface PlayerVisual {
@@ -86,6 +87,7 @@ export class Renderer {
   map: MapDef | null = null;
 
   players = new Map<string, PlayerVisual>();
+  vehicles = new Map<string, THREE.Group>();
   projectiles = new Map<number, THREE.Object3D>();
   pickups = new Map<string, { mesh: THREE.Object3D; baseY: number }>();
   fx: Fx[] = [];
@@ -602,6 +604,28 @@ export class Renderer {
       }
     }
 
+    // vehicles (Wartrolley)
+    const liveVeh = new Set<string>();
+    for (const vs of snap.vehicles ?? []) {
+      liveVeh.add(vs.id);
+      let g = this.vehicles.get(vs.id);
+      if (!g) {
+        g = this.makeVehicle();
+        this.scene.add(g);
+        this.vehicles.set(vs.id, g);
+      }
+      g.position.set(vs.pos.x, vs.pos.y, vs.pos.z);
+      g.rotation.y = vs.yaw;
+      const wheels = g.userData.wheels as THREE.Object3D[] | undefined;
+      if (wheels) for (const w of wheels) w.rotation.x = vs.wheelSpin;
+    }
+    for (const [id, g] of this.vehicles) {
+      if (!liveVeh.has(id)) {
+        this.scene.remove(g);
+        this.vehicles.delete(id);
+      }
+    }
+
     // pickups
     for (const pk of snap.pickups) {
       let entry = this.pickups.get(pk.id);
@@ -674,6 +698,52 @@ export class Renderer {
       );
       g.add(m);
     }
+    return g;
+  }
+
+  // ---------- vehicle (Wartrolley) ----------
+  makeVehicle(): THREE.Group {
+    const g = new THREE.Group();
+    const frame = new THREE.MeshStandardMaterial({ color: 0xb9c2cc, metalness: 0.8, roughness: 0.35 });
+    const accent = new THREE.MeshStandardMaterial({ color: 0xff6a00, emissive: 0xff6a00, emissiveIntensity: 0.5, metalness: 0.5, roughness: 0.4 });
+    // wire basket (front is -Z)
+    const basketGeo = new THREE.BoxGeometry(1.9, 1.0, 2.4);
+    const basket = new THREE.Mesh(
+      basketGeo,
+      new THREE.MeshStandardMaterial({ color: 0x9aa6b2, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.32 }),
+    );
+    basket.position.set(0, 0.95, 0.1);
+    basket.add(new THREE.LineSegments(new THREE.EdgesGeometry(basketGeo), new THREE.LineBasicMaterial({ color: 0xdfe8f0 })));
+    g.add(basket);
+    // chassis
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.18, 2.6), frame);
+    chassis.position.set(0, 0.42, 0);
+    g.add(chassis);
+    // push handle (back, +Z)
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 8, 16, Math.PI), frame);
+    handle.rotation.x = Math.PI / 2;
+    handle.position.set(0, 1.5, 1.35);
+    g.add(handle);
+    // cannon (front, -Z)
+    const cannon = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 1.1), frame);
+    cannon.position.set(0, 1.2, -1.1);
+    g.add(cannon);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.9, 10), accent);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 1.2, -1.85);
+    g.add(barrel);
+    // wheels
+    const wheels: THREE.Object3D[] = [];
+    const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.22, 14);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x15191e, metalness: 0.3, roughness: 0.7 });
+    for (const [sx, sz] of [[-0.85, -1.0], [0.85, -1.0], [-0.85, 1.0], [0.85, 1.0]] as [number, number][]) {
+      const w = new THREE.Mesh(wheelGeo, wheelMat);
+      w.rotation.z = Math.PI / 2; // axle along X
+      w.position.set(sx, 0.36, sz);
+      g.add(w);
+      wheels.push(w);
+    }
+    g.userData.wheels = wheels;
     return g;
   }
 
@@ -856,7 +926,7 @@ export class Renderer {
 
     // viewmodel
     this.buildViewmodel(local.weaponId);
-    this.viewmodel.visible = !local.zoomed && local.alive;
+    this.viewmodel.visible = !local.zoomed && local.alive && !local.inVehicle;
     this.bobT += dt * (Math.hypot(local.vel.x, local.vel.z) > 1 ? 9 : 2);
     if (this.vmWeapon) {
       const recoil = local.firing ? 0.03 : 0;

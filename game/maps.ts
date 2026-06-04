@@ -149,6 +149,11 @@ function bargainGulch(): MapDef {
       moves: [v3(0, 0, 0), v3(-20, 0, 16), v3(20, 0, -16), v3(0, 0, 22), v3(0, 0, -22)],
     },
     oddballSpawn: v3(0, 3.2, 0),
+    vehicleSpawns: [
+      { pos: v3(-30, 0, 10), yaw: Math.PI / 2 },
+      { pos: v3(30, 0, -10), yaw: -Math.PI / 2 },
+    ],
+    skullSpawn: v3(-44, 0, -44),
   };
 }
 
@@ -218,6 +223,7 @@ function warehouse(): MapDef {
     pickups,
     hill: { pos: v3(0, 4.0, 0), radius: 4.5, moves: [v3(0, 4.0, 0), v3(-14, 0, 0), v3(14, 0, 0)] },
     oddballSpawn: v3(0, 1.6, 0),
+    skullSpawn: v3(-26, 0, 26),
   };
 }
 
@@ -294,6 +300,7 @@ function lattice(): MapDef {
     pickups,
     hill: { pos: v3(0, 7.0, 0), radius: 4.5, moves: [v3(0, 7.0, 0), v3(-20, 3.6, -20), v3(20, 3.6, 20)] },
     oddballSpawn: v3(0, 7.0, 0),
+    skullSpawn: v3(0, 0.8, 0),
   };
 }
 

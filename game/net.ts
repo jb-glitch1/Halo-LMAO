@@ -167,12 +167,12 @@ export class HostSession implements SessionLike {
     if (!p) {
       return {
         pos: { x: 0, y: 2, z: 0 }, yaw: 0, pitch: 0, weaponId: "ar", zoomed: false,
-        vel: { x: 0, y: 0, z: 0 }, alive: false, firing: false, team: this.localTeam,
+        vel: { x: 0, y: 0, z: 0 }, alive: false, firing: false, team: this.localTeam, inVehicle: false,
       };
     }
     return {
       pos: { ...p.pos }, yaw: p.yaw, pitch: p.pitch, weaponId: p.weaponId, zoomed: p.zoomed,
-      vel: { ...p.vel }, alive: p.alive, firing: p.firing, team: p.team,
+      vel: { ...p.vel }, alive: p.alive, firing: p.firing, team: p.team, inVehicle: !!p.vehicleId,
     };
   }
 
@@ -229,7 +229,8 @@ export class ClientSession implements SessionLike {
   update(dtMs: number, now: number, input: PlayerInput) {
     if (this.stopped) return;
     this.lastInput = input;
-    this.predictor.step(input, dtMs, this.map);
+    const self = this.snap?.players.find((p) => p.id === this.localId);
+    if (!self?.vehicleId) this.predictor.step(input, dtMs, this.map);
     if (now - this.lastSent >= 1000 / 33) {
       this.lastSent = now;
       this.socket.emit("input", { code: this.roomCode, input });
@@ -245,8 +246,9 @@ export class ClientSession implements SessionLike {
     const input = this.lastInput;
     const weaponId = self?.weaponId || "ar";
     const zoomed = !!weaponDef(weaponId).zoom && !!input?.zoom;
+    const inVehicle = !!self?.vehicleId;
     return {
-      pos: { ...this.predictor.pos },
+      pos: inVehicle && self ? { ...self.pos } : { ...this.predictor.pos },
       yaw: input?.yaw ?? 0,
       pitch: input?.pitch ?? 0,
       weaponId,
@@ -255,6 +257,7 @@ export class ClientSession implements SessionLike {
       alive: self?.alive ?? false,
       firing: !!input?.fire && (self?.alive ?? false),
       team: this.localTeam,
+      inVehicle,
     };
   }
 
