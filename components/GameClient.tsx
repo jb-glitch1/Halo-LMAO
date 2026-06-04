@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import HUD, { HudModel, RadarBlip, KillRow, ScoreRow } from "./HUD";
+import TouchControls from "./TouchControls";
 import { Renderer, type GraphicsQuality } from "@/game/renderer";
 import { InputManager } from "@/game/input";
 import { getAudio } from "@/game/audio";
@@ -79,6 +80,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const [colorblind, setColorblind] = useState<boolean>(() => loadSettings().colorblind ?? false);
   const colorblindRef = useRef(colorblind);
   const liveRef = useRef(false);
+  const [isTouch] = useState(() => typeof window !== "undefined" && (("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0));
 
   // event-dedupe + transient refs
   const lastFx = useRef(0);
@@ -107,6 +109,8 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     const im = new InputManager(canvas);
     imRef.current = im;
     im.setSensitivity((sens / 1000));
+    im.setInvertY(invertY);
+    if (isTouch) im.setTouchActive(true);
 
     im.onPause = () => {
       if (!endedRef.current) {
@@ -430,7 +434,10 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     recordCareer(self, won);
   }, [audio, localId]);
 
-  const resume = () => { imRef.current?.requestLock(); };
+  const resume = () => {
+    if (isTouch) { pausedRef.current = false; setPaused(false); }
+    else imRef.current?.requestLock();
+  };
 
   return (
     <div ref={wrapRef} className="fixed inset-0 bg-black scanlines vignette overflow-hidden">
@@ -438,8 +445,12 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
 
       {hud && <HUD m={hud} />}
 
+      {isTouch && hud && !paused && !ended && imRef.current && (
+        <TouchControls im={imRef.current} onPause={() => { pausedRef.current = true; setPaused(true); }} />
+      )}
+
       {/* click-to-start prompt when not locked and not paused/ended */}
-      {!paused && !ended && hud && !imLocked() && (
+      {!isTouch && !paused && !ended && hud && !imLocked() && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="panel px-6 py-4 text-center pointer-events-none">
             <div className="text-hud-amber font-bold text-lg">Click to lock mouse & play</div>

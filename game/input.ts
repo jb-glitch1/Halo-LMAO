@@ -20,6 +20,30 @@ export class InputManager {
   onLockChange?: (locked: boolean) => void;
   onPause?: () => void;
 
+  // touch controls (mobile) — driven by the on-screen overlay
+  touch = false;
+  private t = { mx: 0, mz: 0, sprint: false, fire: false, jump: false, reload: false, grenade: false, swap: false, crouch: false, pickup: false, melee: false, zoom: false };
+
+  setTouchActive(v: boolean) {
+    this.touch = v;
+    if (v) this.locked = true; // no pointer lock on touch; treat as active
+  }
+  setTouchMove(x: number, z: number) {
+    this.t.mx = x;
+    this.t.mz = z;
+    this.t.sprint = z > 0.85;
+  }
+  setTouchBtn(name: string, v: boolean) {
+    (this.t as Record<string, boolean | number>)[name] = v;
+  }
+  touchLook(dx: number, dy: number) {
+    this.yaw -= dx * this.sensitivity * 1.4;
+    this.pitch -= (this.invertY ? -1 : 1) * dy * this.sensitivity * 1.4;
+    this.pitch = clamp(this.pitch, -1.5, 1.5);
+    if (this.yaw > Math.PI) this.yaw -= Math.PI * 2;
+    if (this.yaw < -Math.PI) this.yaw += Math.PI * 2;
+  }
+
   constructor(el: HTMLElement) {
     this.el = el;
     this.bind();
@@ -48,6 +72,7 @@ export class InputManager {
   }
 
   requestLock() {
+    if (this.touch) return; // touch devices don't use pointer lock
     this.el.requestPointerLock?.();
   }
   exitLock() {
@@ -57,6 +82,7 @@ export class InputManager {
   private onContextMenu = (e: Event) => e.preventDefault();
 
   private onPointerLockChange = () => {
+    if (this.touch) return; // touch mode stays "active" without pointer lock
     this.locked = document.pointerLockElement === this.el;
     if (!this.locked) {
       this.fire = false;
@@ -111,29 +137,35 @@ export class InputManager {
 
   poll(): PlayerInput {
     const k = this.keys;
-    const moveX = (k.has("KeyD") ? 1 : 0) - (k.has("KeyA") ? 1 : 0);
-    const moveZ = (k.has("KeyW") ? 1 : 0) - (k.has("KeyS") ? 1 : 0);
-    const swap = k.has("KeyQ") || this.pendingSwap;
+    const t = this.t;
+    const moveX = (k.has("KeyD") ? 1 : 0) - (k.has("KeyA") ? 1 : 0) || t.mx;
+    const moveZ = (k.has("KeyW") ? 1 : 0) - (k.has("KeyS") ? 1 : 0) || t.mz;
+    const swap = k.has("KeyQ") || this.pendingSwap || t.swap;
     this.pendingSwap = false;
     const input: PlayerInput = {
       moveX,
       moveZ,
       yaw: this.yaw,
       pitch: this.pitch,
-      jump: k.has("Space"),
-      crouch: k.has("ControlLeft") || k.has("KeyC"),
-      sprint: k.has("ShiftLeft") || k.has("ShiftRight"),
-      fire: this.fire && this.locked,
-      altFire: k.has("KeyV") || k.has("KeyF"),
-      reload: k.has("KeyR"),
-      throwGrenade: k.has("KeyG"),
+      jump: k.has("Space") || t.jump,
+      crouch: k.has("ControlLeft") || k.has("KeyC") || t.crouch,
+      sprint: k.has("ShiftLeft") || k.has("ShiftRight") || t.sprint,
+      fire: (this.fire && this.locked) || t.fire,
+      altFire: k.has("KeyV") || k.has("KeyF") || t.melee,
+      reload: k.has("KeyR") || t.reload,
+      throwGrenade: k.has("KeyG") || t.grenade,
       grenadeType: this.grenadeType,
       switchWeapon: swap ? 2 : -1,
-      zoom: this.zoomHeld && this.locked,
-      pickup: k.has("KeyE"),
+      zoom: (this.zoomHeld && this.locked) || t.zoom,
+      pickup: k.has("KeyE") || t.pickup,
       seq: this.seq++,
     };
     return input;
+  }
+
+  // cycle grenade type from the touch UI (mirrors the X key)
+  cycleGrenade() {
+    this.grenadeType = this.grenadeType === "frag" ? "plasma" : this.grenadeType === "plasma" ? "mine" : "frag";
   }
 }
 
