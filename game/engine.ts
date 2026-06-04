@@ -1212,8 +1212,7 @@ export class Engine {
 
   // ---------------- vehicles (Wartrolley) ----------------
   handleVehicleEntry(p: PlayerState, input: PlayerInput, prev: PlayerInput, now: number) {
-    if (p.isBot) return; // carts are a human toy in v1
-    if (!input.pickup || prev.pickup) return; // rising edge of E
+    if (!input.pickup || prev.pickup) return; // rising edge of E (or bot intent)
     if (p.vehicleId) {
       const v = this.vehicles.find((x) => x.id === p.vehicleId);
       if (v) {

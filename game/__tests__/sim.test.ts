@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine } from "../engine";
+import "../bots"; // side-effect: registers the bot brain with the engine
 import { MAP_LIST } from "../maps";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
 import * as C from "../constants";
@@ -141,6 +142,22 @@ test("sandbox integrity: loadouts reference real weapons; DMR present; safe fall
     for (const w of l.weapons) assert.ok(WEAPONS[w], `loadout ${l.id} references real weapon ${w}`);
   }
   assert.equal(weaponDef("does-not-exist").id, "ar", "unknown weapon falls back to the AR");
+});
+
+test("bots board and drive an idle Wartrolley", () => {
+  const e = new Engine(cfg({ mapId: "gulch" }));
+  e.addPlayer("bot", { name: "bot", team: "ffa", isBot: true });
+  e.start(0);
+  e.step(1 / 60, 4000);
+  const cart = e.vehicles[0];
+  const bot = e.players.get("bot")!;
+  bot.pos = { ...cart.pos }; // park the bot on the cart
+  for (let i = 1; i <= 12; i++) e.step(1 / 60, 4000 + i * 16);
+  assert.equal(bot.vehicleId, cart.id, "bot should board the cart it's standing on");
+
+  const sx = cart.pos.x, sz = cart.pos.z;
+  for (let i = 0; i < 50; i++) e.step(1 / 60, 4200 + i * 16);
+  assert.ok(Math.hypot(cart.pos.x - sx, cart.pos.z - sz) > 1, "bot should drive it somewhere");
 });
 
 test("every map boots players onto solid ground, in bounds, alive", () => {

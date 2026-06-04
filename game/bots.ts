@@ -162,6 +162,26 @@ export function botThink(e: Engine, bot: PlayerState, now: number) {
   bot.yaw = aimYaw;
   bot.pitch = aimPitch;
 
+  // ---- driving a Wartrolley (steer with moveX, throttle with moveZ) ----
+  if (bot.vehicleId) {
+    const veh = e.vehicles.find((v) => v.id === bot.vehicleId);
+    if (veh && veh.driver === bot.id) {
+      if (!m.waypoint) m.waypoint = pickWaypoint(e, bot);
+      const goal = target ? (visible ? target.pos : m.lastSeenPos) : m.waypoint;
+      const to = vsub(goal, bot.pos);
+      const desired = Math.atan2(-to.x, -to.z);
+      const dh = ((desired - veh.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      input.moveX = clamp(dh * 1.6, -1, 1);
+      input.moveZ = 1;
+      if (target && visible && vdist(bot.pos, target.pos) < 80) input.fire = true;
+      // wedged against a wall for a while → bail out
+      if (vdist(bot.pos, m.lastPos) > 0.15) { m.lastPos = { ...bot.pos }; m.stuckSince = now; }
+      else if (now - m.stuckSince > 3000) input.pickup = true;
+    }
+    e.setInput(bot.id, input);
+    return;
+  }
+
   // ---- combat movement / engage ----
   const lowHealth = bot.health < 45 && bot.shield <= 0;
   if (target) {
@@ -275,6 +295,15 @@ export function botThink(e: Engine, bot: PlayerState, now: number) {
     if (!pk.available) continue;
     const dd = vdist(bot.pos, pk.pos);
     if (dd < 2.2 && Math.abs(bot.pos.y - pk.pos.y) < 2.6) input.pickup = true;
+  }
+
+  // hop into a nearby idle cart while roaming (bots try their best at driving too)
+  for (const veh of e.vehicles) {
+    if (veh.driver || veh.gunner) continue;
+    if (vdist(bot.pos, veh.pos) < 3 && Math.abs(bot.pos.y - veh.pos.y) < 2) {
+      input.pickup = true;
+      break;
+    }
   }
 
   // unstuck
