@@ -911,7 +911,7 @@ export class Engine {
     }
     if (pr.weapon === "g_mine") {
       this.pushFx("explosion", point, pr.team, "frag", 1.15);
-      this.splash(point, C.FRAG_RADIUS * 0.9, C.FRAG_DAMAGE, owner, "frag", now);
+      this.splash(point, C.FRAG_RADIUS * 0.9, C.FRAG_DAMAGE, owner, "mine", now);
       return;
     }
     // rocket
@@ -1032,6 +1032,8 @@ export class Engine {
       assassin: "sword",
       melee: "ar",
       void: "ar",
+      splatter: "ar",
+      mine: "ar",
     };
     const id = map[weaponId] || weaponId;
     return weaponDef(id);
@@ -1045,6 +1047,7 @@ export class Engine {
     now: number,
   ) {
     if (!victim.alive) return;
+    const victimStreak = victim.streak; // capture before reset (for Killjoy)
     victim.alive = false;
     victim.health = 0;
     victim.shield = 0;
@@ -1107,6 +1110,7 @@ export class Engine {
       else if (headshot) medals.push("Headshot");
       else if (wd.id === "shotgun") medals.push("Hug Specialist");
       else if (weaponId === "splatter") medals.push("Road Rage (clearance)");
+      else if (weaponId === "mine") medals.push("Doorbuster Special");
       else if (weaponId.startsWith("rocket")) medals.push("Boom Tube Bargain");
       else if (weaponId === "needler_combine") medals.push("Pink Mist (off-brand)");
       else if (weaponId.startsWith("plasma") || weaponId === "frag") medals.push("Discount Demolition");
@@ -1114,6 +1118,11 @@ export class Engine {
       if (this.totalKills() === 0) medals.push("First Blood (overpriced)");
       // revenge
       if (victim.id === attacker.lastAttacker) medals.push("Revenge (pettiness +5)");
+      // killjoy — ended someone's spree
+      if (victimStreak >= 5) {
+        medals.push("Killjoy");
+        this.announce("KILLJOY", "ended their spree", true, attacker.id);
+      }
       // assists
       for (const id in victim.recentDamagers) {
         if (id === attacker.id) continue;

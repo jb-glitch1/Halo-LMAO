@@ -57,8 +57,8 @@ export interface HudModel {
 }
 
 const WEAPON_ICON: Record<string, string> = {
-  ar: "🔫", br: "🔫", magnum: "🔫", plasma: "🌀", shotgun: "💥",
-  sniper: "🎯", rocket: "🚀", needler: "📍", sword: "🗡️",
+  ar: "🔫", br: "🔫", magnum: "🔫", dmr: "🔫", plasma: "🌀", shotgun: "💥",
+  sniper: "🎯", rocket: "🚀", needler: "📍", sword: "🗡️", mine: "💣", splatter: "🛒", turret: "🛒",
 };
 
 function teamCss(t: string) {

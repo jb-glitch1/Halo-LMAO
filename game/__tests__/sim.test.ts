@@ -156,6 +156,15 @@ test("sandbox integrity: loadouts reference real weapons; DMR present; safe fall
   assert.equal(weaponDef("does-not-exist").id, "ar", "unknown weapon falls back to the AR");
 });
 
+test("killjoy: ending a 5+ streak announces it to the killer", () => {
+  const e = liveEngine();
+  const a = e.players.get("a")!;
+  const t = e.players.get("b")!;
+  t.streak = 6; // the victim is on a spree
+  e.killPlayer(t, a, "ar", false, 4000);
+  assert.ok(e.announces.some((an) => an.text === "KILLJOY" && an.forId === a.id), "Killjoy awarded to the killer");
+});
+
 test("carnage report: accuracy and longest streak are tracked", () => {
   const e = liveEngine();
   const a = e.players.get("a")!;
