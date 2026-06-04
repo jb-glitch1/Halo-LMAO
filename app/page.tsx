@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import HeroBackdrop from "@/components/HeroBackdrop";
 import { WEAPONS } from "@/game/weapons";
 import { MAP_LIST } from "@/game/maps";
 
@@ -35,26 +36,35 @@ export default function Home() {
       <Nav />
 
       {/* HERO */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-temu-orange/10 via-transparent to-transparent pointer-events-none" />
-        <div className="max-w-6xl mx-auto px-4 pt-16 pb-20 text-center relative">
-          <div className="inline-flex items-center gap-2 chip bg-hud-panel2 border border-hud-line text-hud-amber mb-6 fade-in">
+      <section className="relative overflow-hidden scanlines vignette">
+        <HeroBackdrop />
+
+        {/* visor HUD frame */}
+        <div className="pointer-events-none absolute inset-3 sm:inset-6 z-10">
+          <span className="absolute top-0 left-0 w-10 h-10 border-l-2 border-t-2 border-hud-cyan/40" />
+          <span className="absolute top-0 right-0 w-10 h-10 border-r-2 border-t-2 border-hud-cyan/40" />
+          <span className="absolute bottom-0 left-0 w-10 h-10 border-l-2 border-b-2 border-hud-cyan/40" />
+          <span className="absolute bottom-0 right-0 w-10 h-10 border-r-2 border-b-2 border-hud-cyan/40" />
+        </div>
+
+        <div className="max-w-6xl mx-auto px-4 pt-24 pb-28 text-center relative z-10">
+          <div className="inline-flex items-center gap-2 chip bg-black/40 border border-hud-cyan/30 text-hud-cyan mb-6 fade-in backdrop-blur-sm">
             <span className="w-2 h-2 rounded-full bg-hud-green animate-pulse" /> 100% in-browser · no download · no dignity
           </div>
-          <h1 className="text-6xl sm:text-8xl font-extrabold leading-none mb-4">
-            <span className="title-shimmer">LMAO</span>
+          <h1 className="text-7xl sm:text-9xl font-extrabold leading-none mb-4 hero-title hero-title-flicker">
+            LMAO
           </h1>
-          <p className="text-xl sm:text-2xl font-light text-hud-amber/90 mb-2 tracking-wide">
-            Lethal Mayhem: <span className="font-semibold">Arena Online</span>
+          <p className="text-xl sm:text-2xl font-light text-hud-cyan/90 mb-3 tracking-[0.25em] uppercase">
+            Lethal Mayhem: <span className="font-semibold text-white">Arena Online</span>
           </p>
-          <p className="max-w-2xl mx-auto text-hud-amber/60 mb-8 text-lg">
+          <p className="max-w-2xl mx-auto text-hud-amber/70 mb-8 text-lg">
             The <span className="text-temu-orange font-semibold">Temu-tier Halo</span>. A legally-distinct,
             suspiciously-affordable first-person arena shooter you can host and play with friends in one click.
             Finish the fight.<span className="text-xs align-super">(knockoff)</span>
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
-            <Link href="/play" className="btn-primary text-base !px-8 !py-3.5">
-              ▶ Play Now — It’s Free*
+            <Link href="/play" className="btn btn-holo text-base !px-8 !py-3.5">
+              ▶ Enter the Arena — It’s Free*
             </Link>
             <Link href="/play?host=1" className="btn-cyan text-base !px-6 !py-3.5">
               🎮 Host a Room
@@ -74,7 +84,7 @@ export default function Home() {
               ["4", "Game modes"],
               ["16", "Players / room"],
             ].map(([n, l]) => (
-              <div key={l} className="panel py-4 px-3">
+              <div key={l} className="panel py-4 px-3 bg-black/30">
                 <div className="text-3xl font-extrabold text-hud-cyan text-glow">{n}</div>
                 <div className="label mt-1">{l}</div>
               </div>

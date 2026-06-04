@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import HUD, { HudModel, RadarBlip, KillRow, ScoreRow } from "./HUD";
-import { Renderer } from "@/game/renderer";
+import { Renderer, type GraphicsQuality } from "@/game/renderer";
 import { InputManager } from "@/game/input";
 import { getAudio } from "@/game/audio";
 import { weaponDef } from "@/game/weapons";
@@ -45,6 +45,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sens, setSens] = useState(2.3);
   const [vol, setVol] = useState(0.7);
+  const [gfx, setGfx] = useState<GraphicsQuality>("high");
 
   // event-dedupe + transient refs
   const lastFx = useRef(0);
@@ -64,7 +65,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   // ---- mount ----
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const renderer = new Renderer(canvas);
+    const renderer = new Renderer(canvas, gfx);
     renderer.setMap(session.map);
     rendererRef.current = renderer;
     const im = new InputManager(canvas);
@@ -149,6 +150,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   // apply settings
   useEffect(() => { imRef.current?.setSensitivity(sens / 1000); }, [sens]);
   useEffect(() => { audio.setVolume(vol); }, [vol, audio]);
+  useEffect(() => { rendererRef.current?.setQuality(gfx); }, [gfx]);
 
   const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -366,6 +368,21 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
                 <div>
                   <label className="label">Volume: {Math.round(vol * 100)}%</label>
                   <input type="range" min={0} max={1} step={0.05} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} className="w-full" />
+                </div>
+                <div>
+                  <label className="label">Graphics</label>
+                  <div className="grid grid-cols-3 gap-1 mt-1">
+                    {(["low", "med", "high"] as GraphicsQuality[]).map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => setGfx(q)}
+                        className={`px-2 py-1.5 rounded text-xs font-mono uppercase tracking-wider border transition ${gfx === q ? "bg-hud-cyan/20 border-hud-cyan/60 text-hud-cyan" : "border-hud-line text-hud-amber/60 hover:text-hud-amber"}`}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-hud-amber/40 mt-1">Lower this if the framerate dips. &quot;Low&quot; turns off bloom.</p>
                 </div>
                 <button className="btn-ghost w-full" onClick={() => setSettingsOpen(false)}>Back</button>
               </div>

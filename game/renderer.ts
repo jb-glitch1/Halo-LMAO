@@ -1,8 +1,44 @@
 import * as THREE from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
 import type { MapDef, Snapshot, PlayerState, Team, FxEvent } from "./types";
 import { weaponDef } from "./weapons";
 import * as C from "./constants";
 import { TEAM_COLOR } from "./constants";
+
+// ---- graphics quality presets ----
+export type GraphicsQuality = "low" | "med" | "high";
+interface QualityPreset { post: boolean; pixelCap: number; bloom: number; shadows: boolean; stars: number; }
+const QUALITY: Record<GraphicsQuality, QualityPreset> = {
+  low: { post: false, pixelCap: 1, bloom: 0, shadows: false, stars: 0 },
+  med: { post: true, pixelCap: 1.5, bloom: 0.5, shadows: true, stars: 700 },
+  high: { post: true, pixelCap: 2, bloom: 0.62, shadows: true, stars: 1300 },
+};
+
+// Robustly create a WebGL renderer, degrading options if context creation fails.
+function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
+  const attempts: THREE.WebGLRendererParameters[] = [
+    { canvas, antialias: false, powerPreference: "high-performance" },
+    { canvas, antialias: false, powerPreference: "default" },
+    { canvas },
+  ];
+  let lastErr: unknown;
+  for (const opts of attempts) {
+    try { return new THREE.WebGLRenderer(opts); } catch (e) { lastErr = e; }
+  }
+  throw lastErr ?? new Error("Could not create a WebGL context.");
+}
+
+// Per-map zenith color so the sky dome reads day / indoor / void.
+function skyZenith(map: MapDef): number {
+  if (map.id === "gulch") return 0x244a86; // daytime blue
+  if (map.id === "warehouse") return 0x0a0f16; // dark indoor
+  return 0x0a0618; // space void
+}
 
 export interface LocalRender {
   pos: { x: number; y: number; z: number };
@@ -73,17 +109,60 @@ export class Renderer {
   private geoCache = new Map<string, THREE.BufferGeometry>();
   private matCache = new Map<string, THREE.Material>();
 
-  constructor(canvas: HTMLCanvasElement) {
+  // post-processing + atmosphere
+  quality: GraphicsQuality;
+  usePost = false;
+  composer?: EffectComposer;
+  bloomPass?: UnrealBloomPass;
+  fxaaPass?: ShaderPass;
+  skyMesh?: THREE.Mesh;
+  ringMesh?: THREE.Mesh;
+  stars?: THREE.Points;
+  private blobTex?: THREE.Texture;
+
+  constructor(canvas: HTMLCanvasElement, quality: GraphicsQuality = "high") {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.quality = quality;
+    this.renderer = createRenderer(canvas);
+    this.renderer.setPixelRatio(Math.min(QUALITY[quality].pixelCap, window.devicePixelRatio || 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = false;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(this.baseFov, 1, 0.05, 600);
+    this.camera = new THREE.PerspectiveCamera(this.baseFov, 1, 0.05, 2000);
     this.scene.add(this.camera);
     this.camera.add(this.viewmodel);
     this.scene.add(this.worldGroup);
+    this.buildPost();
+    this.resize();
+  }
+
+  // Build (or rebuild) the post chain for the current quality. Bloom makes
+  // emissive surfaces — visors, energy weapons, plasma, jump pads — glow.
+  buildPost() {
+    this.usePost = QUALITY[this.quality].post;
+    if (this.composer) { this.composer.dispose(); this.composer = undefined; this.bloomPass = undefined; this.fxaaPass = undefined; }
+    if (!this.usePost) return;
+    const w = this.canvas.clientWidth || window.innerWidth;
+    const h = this.canvas.clientHeight || window.innerHeight;
+    const composer = new EffectComposer(this.renderer);
+    composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), QUALITY[this.quality].bloom, 0.4, 0.85);
+    composer.addPass(bloom);
+    const fxaa = new ShaderPass(FXAAShader); // composer disables MSAA, so AA in a pass
+    composer.addPass(fxaa);
+    composer.addPass(new OutputPass()); // tone-map + sRGB for the whole frame
+    this.composer = composer;
+    this.bloomPass = bloom;
+    this.fxaaPass = fxaa;
+  }
+
+  setQuality(q: GraphicsQuality) {
+    if (q === this.quality) return;
+    this.quality = q;
+    this.renderer.setPixelRatio(Math.min(QUALITY[q].pixelCap, window.devicePixelRatio || 1));
+    this.buildPost();
     this.resize();
   }
 
@@ -93,9 +172,77 @@ export class Renderer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    if (this.composer) {
+      this.composer.setSize(w, h);
+      const pr = this.renderer.getPixelRatio();
+      this.bloomPass?.setSize(w, h);
+      if (this.fxaaPass) this.fxaaPass.material.uniforms["resolution"].value.set(1 / (w * pr), 1 / (h * pr));
+    }
+  }
+
+  // ---------- atmosphere ----------
+  private makeSky(horizon: THREE.Color, zenith: THREE.Color): THREE.Mesh {
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: { top: { value: zenith }, bottom: { value: horizon }, offset: { value: 40 }, expo: { value: 0.55 } },
+      vertexShader: "varying vec3 vP; void main(){ vec4 wp = modelMatrix*vec4(position,1.0); vP = wp.xyz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+      fragmentShader: "uniform vec3 top; uniform vec3 bottom; uniform float offset; uniform float expo; varying vec3 vP; void main(){ float h = normalize(vP + vec3(0.0, offset, 0.0)).y; float t = pow(max(h, 0.0), expo); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }",
+    });
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), mat);
+    sky.renderOrder = -2;
+    return sky;
+  }
+
+  // The signature ring arcing across the sky (open maps only). Generic, logo-free.
+  private makeRing(map: MapDef): THREE.Mesh {
+    const col = map.id === "lattice" ? 0x9a7bff : 0xbfe4ff;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(560, 16, 8, 120),
+      new THREE.MeshBasicMaterial({ color: col, fog: false, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+    );
+    ring.position.set(40, 90, -360);
+    ring.rotation.set(1.22, 0.35, 0.2);
+    ring.renderOrder = -1;
+    return ring;
+  }
+
+  private makeStars(count: number): THREE.Points {
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(Math.random()); // bias to upper hemisphere
+      const r = 820;
+      arr[i * 3] = r * Math.sin(ph) * Math.cos(th);
+      arr[i * 3 + 1] = r * Math.cos(ph) + 30;
+      arr[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xbfd0ff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.85, fog: false, depthWrite: false }));
+    pts.renderOrder = -2;
+    return pts;
+  }
+
+  private blobMaterial(): THREE.Material {
+    if (!this.blobTex) {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 64;
+      const ctx = cv.getContext("2d")!;
+      const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+      g.addColorStop(0, "rgba(0,0,0,0.55)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 64, 64);
+      this.blobTex = new THREE.CanvasTexture(cv);
+    }
+    return new THREE.MeshBasicMaterial({ map: this.blobTex, transparent: true, depthWrite: false });
   }
 
   dispose() {
+    this.composer?.dispose();
+    this.blobTex?.dispose();
     this.renderer.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -115,20 +262,46 @@ export class Renderer {
     for (const f of this.fx) this.scene.remove(f.obj);
     this.fx = [];
 
-    this.scene.background = new THREE.Color(map.fog);
-    this.scene.fog = new THREE.Fog(map.fog, map.size * 0.7, map.size * 2.4);
+    // ----- atmosphere: gradient sky dome, signature ring, stars, fog -----
+    const horizon = new THREE.Color(map.fog);
+    const zenith = new THREE.Color(skyZenith(map));
+    this.scene.background = horizon.clone();
+    this.scene.fog = new THREE.Fog(map.fog, map.size * 0.85, map.size * 3.0);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, map.ambient, 1.05);
-    this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.position.set(map.size * 0.6, map.size, map.size * 0.3);
-    this.scene.add(sun);
-    const amb = new THREE.AmbientLight(map.ambient, 0.55);
-    this.scene.add(amb);
+    this.skyMesh = this.makeSky(horizon, zenith);
+    this.worldGroup.add(this.skyMesh);
+
+    if (map.id === "gulch" || map.id === "lattice") {
+      this.ringMesh = this.makeRing(map);
+      this.worldGroup.add(this.ringMesh);
+    } else {
+      this.ringMesh = undefined;
+    }
+
+    const lum = (map.fog & 0xff) + ((map.fog >> 8) & 0xff) + ((map.fog >> 16) & 0xff);
+    const starCount = QUALITY[this.quality].stars;
+    if (starCount && lum < 200) {
+      this.stars = this.makeStars(starCount);
+      this.worldGroup.add(this.stars);
+    } else {
+      this.stars = undefined;
+    }
+
+    // ----- lighting: warm key sun + cool sky fill + cool rim -----
+    const hemi = new THREE.HemisphereLight(0xeaf4ff, map.ambient, 0.95);
+    this.worldGroup.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff1da, 1.35);
+    sun.position.set(map.size * 0.6, map.size * 1.25, map.size * 0.35);
+    this.worldGroup.add(sun);
+    const rim = new THREE.DirectionalLight(0x9fc6ff, 0.5);
+    rim.position.set(-map.size * 0.5, map.size * 0.55, -map.size * 0.6);
+    this.worldGroup.add(rim);
+    const amb = new THREE.AmbientLight(map.ambient, 0.4);
+    this.worldGroup.add(amb);
 
     // floor
     const floorGeo = new THREE.PlaneGeometry(map.size * 2.2, map.size * 2.2);
-    const floorMat = new THREE.MeshLambertMaterial({ color: map.floorColor });
+    const floorMat = new THREE.MeshStandardMaterial({ color: map.floorColor, metalness: 0.12, roughness: 0.92 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = 0.001;
@@ -150,11 +323,13 @@ export class Renderer {
       if (b.team === "red") color = mix(color, 0xff4d5e, 0.5);
       if (b.team === "blue") color = mix(color, 0x3aa0ff, 0.5);
       const transparent = b.kind === "glass";
-      const mat = new THREE.MeshLambertMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         color,
         transparent,
         opacity: transparent ? 0.35 : 1,
-        emissive: b.team ? new THREE.Color(color).multiplyScalar(0.12) : 0x000000,
+        metalness: transparent ? 0.0 : 0.28,
+        roughness: transparent ? 0.1 : 0.68,
+        emissive: b.team ? new THREE.Color(color).multiplyScalar(0.16) : 0x000000,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2);
@@ -179,7 +354,7 @@ export class Renderer {
       let color = r.color ?? 0x5a6275;
       if (r.team === "red") color = mix(color, 0xff4d5e, 0.5);
       if (r.team === "blue") color = mix(color, 0x3aa0ff, 0.5);
-      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, metalness: 0.28, roughness: 0.68 }));
       const cx = (r.min.x + r.max.x) / 2;
       const cz = (r.min.z + r.max.z) / 2;
       const cy = (r.baseY + r.topY) / 2;
@@ -303,19 +478,33 @@ export class Renderer {
     if (v) return v;
     const group = new THREE.Group();
     const teamHex = TEAM_HEX[p.team] ?? 0xcccccc;
-    const bodyMat = new THREE.MeshStandardMaterial({ color: teamHex, metalness: 0.45, roughness: 0.5 });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.9, 4, 10), bodyMat);
+    const armorMat = new THREE.MeshStandardMaterial({ color: teamHex, metalness: 0.5, roughness: 0.42 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(teamHex).multiplyScalar(0.45), metalness: 0.55, roughness: 0.4 });
+    // torso + chest plate
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.33, 0.8, 4, 10), armorMat);
     body.position.y = 0.95;
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.44, 0.36), darkMat);
+    chest.position.set(0, 1.16, 0.02);
+    // pauldrons
+    const pauldron = new THREE.BoxGeometry(0.24, 0.22, 0.34);
+    const lPaul = new THREE.Mesh(pauldron, armorMat);
+    lPaul.position.set(-0.44, 1.3, 0);
+    const rPaul = new THREE.Mesh(pauldron, armorMat);
+    rPaul.position.set(0.44, 1.3, 0);
+    // helmet + brow + visor slit
     const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.26, 14, 12),
-      new THREE.MeshStandardMaterial({ color: 0x3a4048, metalness: 0.6, roughness: 0.35 }),
+      new THREE.SphereGeometry(0.24, 16, 14),
+      new THREE.MeshStandardMaterial({ color: 0x363c44, metalness: 0.62, roughness: 0.34 }),
     );
-    head.position.y = 1.62;
+    head.position.y = 1.63;
+    head.scale.set(1, 1.05, 1.14);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.09, 0.12), darkMat);
+    brow.position.set(0, 1.72, -0.12);
     const visor = new THREE.Mesh(
-      new THREE.BoxGeometry(0.34, 0.12, 0.12),
-      new THREE.MeshStandardMaterial({ color: 0xffc24d, emissive: 0xffa01e, emissiveIntensity: 0.7, metalness: 0.2, roughness: 0.2 }),
+      new THREE.BoxGeometry(0.3, 0.1, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0xffc24d, emissive: 0xffa01e, emissiveIntensity: 1.1, metalness: 0.2, roughness: 0.2 }),
     );
-    visor.position.set(0, 1.64, -0.2);
+    visor.position.set(0, 1.62, -0.18);
     const weapon = new THREE.Mesh(
       new THREE.BoxGeometry(0.1, 0.12, 0.6),
       new THREE.MeshStandardMaterial({ color: 0x23272e, metalness: 0.6, roughness: 0.4 }),
@@ -328,8 +517,14 @@ export class Renderer {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.03;
     const tag = this.makeTag(p.name, teamHex);
-    tag.position.y = 2.25;
-    group.add(body, head, visor, weapon, ring, tag);
+    tag.position.y = 2.3;
+    group.add(body, chest, lPaul, rPaul, head, brow, visor, weapon, ring, tag);
+    if (QUALITY[this.quality].shadows) {
+      const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), this.blobMaterial());
+      blob.rotation.x = -Math.PI / 2;
+      blob.position.y = 0.02;
+      group.add(blob);
+    }
     this.scene.add(group);
     v = { group, body, head, visor, ring, tag, weapon, targetPos: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), targetYaw: p.yaw, team: p.team, seen: true };
     this.players.set(p.id, v);
@@ -676,7 +871,9 @@ export class Renderer {
     }
 
     this.updateFx(now, dt);
-    this.renderer.render(this.scene, this.camera);
+    if (this.ringMesh) this.ringMesh.rotation.z += dt * 0.004;
+    if (this.composer && this.usePost) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   // raycast helper for client-side prediction hit feedback (not used for authority)
