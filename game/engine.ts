@@ -12,6 +12,8 @@ import type {
   MapDef,
   Team,
   PowerupId,
+  SkullId,
+  VehicleState,
 } from "./types";
 import * as C from "./constants";
 import { weaponDef, loadoutById, POWER_WEAPONS } from "./weapons";
@@ -93,6 +95,11 @@ export class Engine {
   oddballPos: Vec3 = v3();
   oddballCarrier: string | null = null;
 
+  // infection (Black Friday)
+  private _announcedLast = false;
+  // vehicles (Wartrolley)
+  vehicles: VehicleState[] = [];
+
   private nextProjId = 1;
   private nextEventId = 1;
   private multi = new Map<string, { count: number; at: number }>();
@@ -115,10 +122,50 @@ export class Engine {
     this.teamScore = { red: 0, blue: 0 };
     this.winner = null;
     this.projectiles = [];
+    this._announcedLast = false;
     this.initPickups();
     this.initMode(now);
+    this.initVehicles(now);
+    if (this.config.mode === "infection") this.setupInfection();
     this.announce("GET READY", "Match starts in a sec…", true);
     for (const p of this.players.values()) this.spawnPlayer(p, now, true);
+  }
+
+  hasSkull(id: SkullId) {
+    return !!this.config.skulls?.includes(id);
+  }
+
+  // Pick the alpha "doorbusters". Prefer bots as patient zero so a solo human
+  // usually starts as a survivor.
+  setupInfection() {
+    const all = [...this.players.values()];
+    for (const p of all) {
+      p.team = "blue";
+      p.infected = false;
+    }
+    const n = Math.max(1, Math.round(all.length * 0.25));
+    const pool = all
+      .slice()
+      .sort((a, b) => (a.isBot === b.isBot ? this.rng() - 0.5 : a.isBot ? -1 : 1));
+    for (let i = 0; i < n && i < pool.length; i++) {
+      pool[i].team = "red";
+      pool[i].infected = true;
+    }
+  }
+
+  initVehicles(now: number) {
+    this.vehicles = (this.map.vehicleSpawns || []).map((s, i) => ({
+      id: "veh_" + i,
+      kind: "wartrolley" as const,
+      pos: { ...s.pos },
+      vel: v3(),
+      yaw: s.yaw,
+      wheelSpin: 0,
+      driver: null,
+      gunner: null,
+      health: C.VEHICLE_HEALTH,
+      fireReadyAt: now,
+    }));
   }
 
   initPickups() {
@@ -239,12 +286,31 @@ export class Engine {
     p.powerups = {};
     p.carryingOddball = false;
     p.recentDamagers = {};
-    // reset to starting loadout weapons
-    const lo = loadoutById(this.config.startingLoadout);
-    p.weapons = [...lo.weapons];
-    p.weaponId = lo.weapons[0];
-    p.grenades = { frag: 2, plasma: lo.grenade === "plasma" ? 2 : 1 };
+    p.vehicleId = null;
+    p.vehicleSeat = undefined;
+    // loadout — infected get the energy butterknife; survivors their loadout
+    if (this.config.mode === "infection" && p.infected) {
+      p.weapons = ["sword"];
+      p.weaponId = "sword";
+      p.grenades = { frag: 0, plasma: 0 };
+      p.maxShield = 0;
+      p.shield = 0;
+      p.health = 150; // tanky melee horde
+      p.powerups = { speed: now + 9_000_000 }; // permanently quick
+    } else {
+      const lo = loadoutById(this.config.startingLoadout);
+      p.weapons = [...lo.weapons];
+      p.weaponId = lo.weapons[0];
+      p.grenades = { frag: this.hasSkull("famine") ? 1 : 2, plasma: lo.grenade === "plasma" ? 2 : 1 };
+      if (this.hasSkull("thrifty")) {
+        p.maxShield = 0;
+        p.shield = 0;
+      }
+    }
     this.resetAmmo(p);
+    if (this.hasSkull("famine")) {
+      for (const w of Object.keys(p.ammo)) p.ammo[w].reserve = Math.floor(p.ammo[w].reserve * 0.4);
+    }
     this.pushFx("spawn", p.pos, p.team);
   }
 
@@ -335,8 +401,9 @@ export class Engine {
   applyMovement(p: PlayerState, input: PlayerInput, dt: number, now: number) {
     const speedPU = p.powerups.speed && p.powerups.speed > now ? C.SPEED_MULT : 1;
     const oddballMult = p.carryingOddball ? 1.05 : 1;
+    const sugar = this.hasSkull("sugar") ? 1.22 : 1;
     const res = applyMovementStep(p, input, dt, this.map, {
-      speedMult: speedPU * oddballMult,
+      speedMult: speedPU * oddballMult * sugar,
       zoomed: p.zoomed,
     });
     p.grounded = res.grounded;
@@ -951,6 +1018,26 @@ export class Engine {
     this.killFeed.push(ke);
     while (this.killFeed.length > C.KILLFEED_KEEP) this.killFeed.shift();
 
+    // ---- skull modifiers on death ----
+    if (this.hasSkull("boom")) {
+      const at = vadd(victim.pos, v3(0, 0.8, 0));
+      this.pushFx("explosion", at, victim.team, "frag", 1.2);
+      this.splash(at, C.FRAG_RADIUS * 0.9, C.FRAG_DAMAGE, undefined, "frag", now, victim.id);
+    }
+    if (this.hasSkull("birthday") && headshot) {
+      this.pushFx("confetti", vadd(victim.pos, v3(0, 1.4, 0)), attacker?.team);
+      this.announce("GRUNT BIRTHDAY PARTY", "🎉 surprise!", true, attacker?.id);
+    }
+
+    // ---- infection: a fallen survivor joins the horde ----
+    if (this.config.mode === "infection" && !victim.infected) {
+      victim.infected = true;
+      victim.team = "red";
+      this.teamScore.red += 1;
+      if (attacker && attacker.id !== victim.id) attacker.score++;
+      this.announce("VALUE-ACQUIRED", "you have been infected", true, victim.id);
+    }
+
     this.checkWin(now);
   }
 
@@ -1149,6 +1236,23 @@ export class Engine {
       }
     }
 
+    if (this.config.mode === "infection") {
+      let survivors = 0;
+      for (const p of this.players.values()) {
+        if (p.infected) continue;
+        survivors++;
+        if (p.alive) {
+          p.score += dt;
+          this.teamScore.blue += dt;
+        }
+      }
+      if (survivors === 1 && !this._announcedLast) {
+        this._announcedLast = true;
+        this.announce("LAST SHOPPER STANDING", "everyone wants what's in your cart", true);
+      }
+      if (survivors === 0) this.endMatch("score");
+    }
+
     // slayer/team win by kills handled in killPlayer via checkWin
   }
 
@@ -1167,18 +1271,30 @@ export class Engine {
   endMatch(reason: "score" | "time") {
     this.phase = "over";
     this.winner = this.computeWinner();
-    const wname =
-      this.config.mode === "team" || (this.config.mode !== "slayer" && this.usesTeams())
-        ? (this.winner === "red" ? "RED WINS" : this.winner === "blue" ? "BLUE WINS" : "DRAW")
-        : `${this.winnerName()} WINS`;
-    this.announce(wname, reason === "time" ? "Time! (clock was also clearance)" : "Score limit reached", true);
+    let wname: string;
+    let sub: string;
+    if (this.config.mode === "infection") {
+      wname = this.winner === "red" ? "THE HORDE WINS" : "SURVIVORS WIN";
+      sub = this.winner === "red" ? "everyone got value-acquired" : "you outlasted the doorbusters";
+    } else if (this.usesTeams()) {
+      wname = this.winner === "red" ? "RED WINS" : this.winner === "blue" ? "BLUE WINS" : "DRAW";
+      sub = reason === "time" ? "Time! (clock was also clearance)" : "Score limit reached";
+    } else {
+      wname = `${this.winnerName()} WINS`;
+      sub = reason === "time" ? "Time! (clock was also clearance)" : "Score limit reached";
+    }
+    this.announce(wname, sub, true);
   }
 
   usesTeams() {
-    return this.config.mode === "team";
+    return this.config.mode === "team" || this.config.mode === "infection";
   }
 
   computeWinner(): Team | string | null {
+    if (this.config.mode === "infection") {
+      const anySurvivor = [...this.players.values()].some((p) => !p.infected);
+      return anySurvivor ? "blue" : "red";
+    }
     if (this.config.mode === "team") {
       if (this.teamScore.red === this.teamScore.blue) return null;
       return this.teamScore.red > this.teamScore.blue ? "red" : "blue";
@@ -1203,6 +1319,7 @@ export class Engine {
         team: "TEAM SLAYER — red vs blue",
         koth: "KING OF THE HILL — hold the discount zone",
         oddball: "ODDBALL — hold the cursed ball",
+        infection: "BLACK FRIDAY — survive the doorbuster horde",
       } as Record<string, string>
     )[this.config.mode];
   }
@@ -1246,6 +1363,7 @@ export class Engine {
       teamScore: { red: Math.floor(this.teamScore.red), blue: Math.floor(this.teamScore.blue) },
       players,
       projectiles: this.projectiles.map((p) => ({ ...p, pos: { ...p.pos }, vel: { ...p.vel } })),
+      vehicles: this.vehicles.map((v) => ({ ...v, pos: { ...v.pos }, vel: { ...v.vel } })),
       pickups: this.pickups.map((p) => ({ ...p, pos: { ...p.pos } })),
       kills: this.killFeed.slice(),
       hits: this.hits.slice(),

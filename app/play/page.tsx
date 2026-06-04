@@ -22,6 +22,7 @@ const MODES = [
   { id: "team", name: "Team Slayer", d: "Red vs Blue" },
   { id: "koth", name: "King of the Hill", d: "Hold the zone" },
   { id: "oddball", name: "Oddball", d: "Hold the ball" },
+  { id: "infection", name: "Black Friday", d: "Survive the horde" },
 ] as const;
 const SKILLS = [{ v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.78, n: "ODST" }, { v: 0.95, n: "Legendary" }];
 function hexc(n: number) { return "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6); }
@@ -127,7 +128,7 @@ function PlayInner() {
   function startSolo(cfg: MatchConfig) {
     soloCfgRef.current = cfg;
     const localId = "me";
-    const team = cfg.mode === "slayer" ? "ffa" : "red";
+    const team = cfg.mode === "slayer" || cfg.mode === "infection" ? "ffa" : "red";
     const roster = [{ id: localId, name: profile().name, team, ready: true, isHost: true, loadout: cfg.startingLoadout, spartanColor: color }];
     const session = new HostSession({ socket: null, roomCode: "SOLO", localId, config: cfg, roster: roster as any });
     sessionRef.current = { session, localId, isHost: true, online: false };

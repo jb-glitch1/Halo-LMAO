@@ -72,6 +72,19 @@ export const BOT_FOV = Math.PI * 0.9; // ~160 deg awareness cone (wide, they "fe
 export const BOT_REACTION_MIN_MS = 120;
 export const BOT_REACTION_MAX_MS = 520;
 
+// Wartrolley (vehicle) — arcade shopping-cart 'hog
+export const VEHICLE_HEALTH = 800;
+export const VEHICLE_RADIUS = 1.25;
+export const VEHICLE_HEIGHT = 1.5;
+export const VEHICLE_ACCEL = 26; // m/s^2 throttle
+export const VEHICLE_MAX_SPEED = 18;
+export const VEHICLE_REVERSE_SPEED = 7;
+export const VEHICLE_TURN_RATE = 2.3; // rad/s (scaled by speed)
+export const VEHICLE_FRICTION = 2.4; // coasting decel
+export const VEHICLE_SPLATTER_SPEED = 7; // min speed to flatten a Spartan
+export const VEHICLE_SEAT_EYE = 1.55; // camera height while riding
+export const VEHICLE_CANNON_RPM = 480;
+
 // Misc
 export const KILLFEED_KEEP = 6;
 export const FX_KEEP = 80;

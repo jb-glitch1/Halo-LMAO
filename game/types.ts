@@ -1,7 +1,8 @@
 import type { Vec3 } from "./vec";
 
 export type Team = "red" | "blue" | "ffa";
-export type GameModeId = "slayer" | "team" | "koth" | "oddball";
+export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection";
+export type SkullId = "thrifty" | "boom" | "birthday" | "famine" | "sugar";
 
 export interface Box {
   // Axis-aligned box collider, world space.
@@ -63,6 +64,21 @@ export interface MapDef {
   pickups: PickupSpawn[];
   hill?: { pos: Vec3; radius: number; moves?: Vec3[] }; // KotH zone(s)
   oddballSpawn?: Vec3;
+  vehicleSpawns?: { pos: Vec3; yaw: number }[]; // Wartrolley spawns
+  skullSpawn?: Vec3; // hidden chaos-skull easter egg
+}
+
+export interface VehicleState {
+  id: string;
+  kind: "wartrolley";
+  pos: Vec3;
+  vel: Vec3;
+  yaw: number; // heading (separate from occupants' look)
+  wheelSpin: number; // accumulator for wheel rotation (render)
+  driver: string | null;
+  gunner: string | null;
+  health: number;
+  fireReadyAt: number;
 }
 
 export type WeaponType = "hitscan" | "projectile" | "melee";
@@ -184,6 +200,11 @@ export interface PlayerState {
   grounded: boolean;
   moving: boolean;
   ping?: number;
+  // infection (Black Friday): role flag, true once "value-acquired"
+  infected?: boolean;
+  // vehicle occupancy
+  vehicleId?: string | null;
+  vehicleSeat?: "driver" | "gunner";
 }
 
 export interface KillEvent {
@@ -220,7 +241,9 @@ export interface FxEvent {
     | "shieldpop"
     | "stick"
     | "pickup"
-    | "lift";
+    | "lift"
+    | "splatter"
+    | "confetti";
   pos: Vec3;
   pos2?: Vec3; // for tracers (end)
   team?: Team;
@@ -256,6 +279,7 @@ export interface MatchConfig {
   botSkill: number; // 0..1
   friendlyFire: boolean;
   startingLoadout: string; // loadout id
+  skulls?: SkullId[]; // active chaos modifiers
 }
 
 export interface Snapshot {
@@ -271,6 +295,7 @@ export interface Snapshot {
   oddball?: { pos: Vec3; carrier: string | null };
   players: PlayerState[];
   projectiles: ProjectileState[];
+  vehicles?: VehicleState[];
   pickups: PickupRuntime[];
   kills: KillEvent[]; // recent
   hits: HitEvent[]; // recent damage events (for hitmarkers)

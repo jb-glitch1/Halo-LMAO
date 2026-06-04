@@ -11,6 +11,7 @@ const MODES: { id: MatchConfig["mode"]; name: string; teams: boolean }[] = [
   { id: "team", name: "Team Slayer", teams: true },
   { id: "koth", name: "King of the Hill", teams: true },
   { id: "oddball", name: "Oddball", teams: true },
+  { id: "infection", name: "Black Friday", teams: false },
 ];
 const SKILLS = [
   { v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.75, n: "ODST" }, { v: 0.95, n: "Legendary" },
@@ -21,7 +22,7 @@ export default function Lobby({ lobby, room, selfId, onLeave }: { lobby: LobbyCl
   const me = room.players.find((p) => p.id === selfId);
   const isHost = room.hostId === selfId;
   const cfg = room.config;
-  const teamMode = cfg.mode !== "slayer";
+  const teamMode = cfg.mode === "team" || cfg.mode === "koth" || cfg.mode === "oddball";
   const [copied, setCopied] = useState(false);
   const [chat, setChat] = useState("");
 
