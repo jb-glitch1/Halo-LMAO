@@ -8,8 +8,10 @@ export class AudioEngine {
   muted = false;
   volume = 0.7;
   announcerOn = true;
+  announcerStyle: "cashier" | "infomercial" | "manager" = "cashier";
   private lastAnnounce = 0;
   private voice: SpeechSynthesisVoice | null = null;
+  private choir: { osc: OscillatorNode[]; gain: GainNode } | null = null;
 
   ensure() {
     if (this.ctx) return;
@@ -38,6 +40,67 @@ export class AudioEngine {
   setMuted(m: boolean) {
     this.muted = m;
     if (this.master) this.master.gain.value = m ? 0 : this.volume;
+  }
+  setAnnouncerStyle(s: "cashier" | "infomercial" | "manager") {
+    this.announcerStyle = s;
+  }
+
+  // A legally-distinct choir pad — the one sound everyone associates with that
+  // ring game, built from detuned sines so it ships with zero audio files.
+  ambience(on: boolean) {
+    this.ensure();
+    if (!this.ctx || !this.master) return;
+    const ctx = this.ctx;
+    if (on) {
+      if (this.choir) return;
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      g.gain.setTargetAtTime(0.06, ctx.currentTime, 1.4);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 950;
+      g.connect(lp);
+      lp.connect(this.master);
+      const chord = [130.81, 196.0, 261.63, 329.63]; // Cmin-ish "ooooh"
+      const osc: OscillatorNode[] = [];
+      for (const f of chord) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = f;
+        const od = ctx.createOscillator();
+        od.type = "sine";
+        od.frequency.value = f * 1.006; // detuned twin
+        const og = ctx.createGain();
+        og.gain.value = 0.5;
+        o.connect(og);
+        od.connect(og);
+        og.connect(g);
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.13 + Math.random() * 0.1;
+        const lfog = ctx.createGain();
+        lfog.gain.value = f * 0.004;
+        lfo.connect(lfog);
+        lfog.connect(o.frequency);
+        o.start();
+        od.start();
+        lfo.start();
+        osc.push(o, od, lfo);
+      }
+      this.choir = { osc, gain: g };
+    } else {
+      if (!this.choir) return;
+      const { osc, gain } = this.choir;
+      gain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5);
+      const stopAt = ctx.currentTime + 1.4;
+      for (const o of osc) {
+        try {
+          o.stop(stopAt);
+        } catch {
+          /* already stopped */
+        }
+      }
+      this.choir = null;
+    }
   }
 
   private pickVoice() {
@@ -142,6 +205,10 @@ export class AudioEngine {
         tone(500, "sine", 0.3, 0.25, 1400);
         tone(900, "triangle", 0.2, 0.2, 200);
         break;
+      case "turret":
+        burst(0.05, 0.45, 3200);
+        tone(220, "square", 0.22, 0.05, 120);
+        break;
       default:
         burst(0.06, 0.4, 2500);
     }
@@ -234,6 +301,23 @@ export class AudioEngine {
       case "go":
         tone(660, "square", 0.25, 0.3, 990);
         break;
+      case "splatter":
+        noise(0.22, 0.7, 1400);
+        tone(90, "sawtooth", 0.4, 0.22, 45);
+        break;
+      case "honk":
+        tone(420, "square", 0.3, 0.18, 400);
+        setTimeout(() => tone(330, "square", 0.3, 0.22, 320), 90);
+        break;
+      case "skull":
+        tone(110, "sawtooth", 0.4, 0.6, 55);
+        tone(220, "sine", 0.2, 0.5, 110);
+        break;
+      case "confetti":
+        tone(880, "triangle", 0.18, 0.1, 1600);
+        setTimeout(() => tone(1320, "triangle", 0.15, 0.1, 1980), 70);
+        setTimeout(() => tone(1760, "triangle", 0.12, 0.1, 2200), 140);
+        break;
     }
   }
 
@@ -247,8 +331,9 @@ export class AudioEngine {
     try {
       const u = new SpeechSynthesisUtterance(text);
       if (this.voice) u.voice = this.voice;
-      u.rate = 1.02;
-      u.pitch = 0.7;
+      const style = this.announcerStyle;
+      u.rate = style === "infomercial" ? 1.3 : style === "manager" ? 0.92 : 1.02;
+      u.pitch = style === "infomercial" ? 1.3 : style === "manager" ? 0.5 : 0.7;
       u.volume = this.muted ? 0 : Math.min(1, this.volume + 0.2);
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);

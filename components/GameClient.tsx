@@ -46,6 +46,8 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const [sens, setSens] = useState(2.3);
   const [vol, setVol] = useState(0.7);
   const [gfx, setGfx] = useState<GraphicsQuality>("high");
+  const [announcer, setAnnouncer] = useState<"cashier" | "infomercial" | "manager">("cashier");
+  const liveRef = useRef(false);
 
   // event-dedupe + transient refs
   const lastFx = useRef(0);
@@ -68,6 +70,8 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     const renderer = new Renderer(canvas, gfx);
     renderer.setMap(session.map);
     rendererRef.current = renderer;
+    liveRef.current = false;
+    audio.ambience(true); // choir swell over the warmup
     const im = new InputManager(canvas);
     imRef.current = im;
     im.setSensitivity((sens / 1000));
@@ -113,6 +117,10 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       if (snap) {
         renderer.applySnapshot(snap, localId, session.localTeam);
         processEvents(snap, local.pos, now);
+        if (snap.phase === "live" && !liveRef.current) {
+          liveRef.current = true;
+          audio.ambience(false); // cut the choir when the fight starts
+        }
         if (snap.phase === "over" && !endedRef.current) {
           endedRef.current = true;
           handleEnd(snap);
@@ -140,6 +148,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       window.removeEventListener("keyup", onKeyUp);
       im.unbind();
       renderer.dispose();
+      audio.ambience(false);
       session.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,6 +160,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   useEffect(() => { imRef.current?.setSensitivity(sens / 1000); }, [sens]);
   useEffect(() => { audio.setVolume(vol); }, [vol, audio]);
   useEffect(() => { rendererRef.current?.setQuality(gfx); }, [gfx]);
+  useEffect(() => { audio.setAnnouncerStyle(announcer); }, [announcer, audio]);
 
   const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -169,6 +179,8 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
         case "pickup": audio.sfx("pickup", d); break;
         case "spawn": if (d < 4) audio.sfx("spawn", 0); break;
         case "death": audio.sfx("death", d); break;
+        case "splatter": audio.sfx("splatter", d); break;
+        case "confetti": audio.sfx("confetti", d); break;
       }
     }
     if (snap.fx.length) lastFx.current = Math.max(lastFx.current, snap.fx[snap.fx.length - 1].id);
@@ -383,6 +395,20 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
                     ))}
                   </div>
                   <p className="text-[10px] text-hud-amber/40 mt-1">Lower this if the framerate dips. &quot;Low&quot; turns off bloom.</p>
+                </div>
+                <div>
+                  <label className="label">Announcer</label>
+                  <div className="grid grid-cols-3 gap-1 mt-1">
+                    {([["cashier", "Cashier"], ["infomercial", "Infomercial"], ["manager", "Manager"]] as const).map(([id, lbl]) => (
+                      <button
+                        key={id}
+                        onClick={() => setAnnouncer(id)}
+                        className={`px-1 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider border transition ${announcer === id ? "bg-hud-cyan/20 border-hud-cyan/60 text-hud-cyan" : "border-hud-line text-hud-amber/60 hover:text-hud-amber"}`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <button className="btn-ghost w-full" onClick={() => setSettingsOpen(false)}>Back</button>
               </div>

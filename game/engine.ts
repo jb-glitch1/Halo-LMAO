@@ -177,6 +177,17 @@ export class Engine {
       available: true,
       readyAt: 0,
     }));
+    // hidden chaos-skull easter egg
+    if (this.map.skullSpawn) {
+      this.pickups.push({
+        id: "__skull",
+        kind: "powerup",
+        what: "skull",
+        pos: { ...this.map.skullSpawn },
+        available: true,
+        readyAt: 0,
+      });
+    }
   }
 
   initMode(now: number) {
@@ -1083,6 +1094,12 @@ export class Engine {
       if (!pk.available) continue;
       if (vdist(p.pos, pk.pos) > 2.4) continue;
       if (Math.abs(p.pos.y - pk.pos.y) > 2.6) continue;
+      if (pk.what === "skull") {
+        this.foundSkull(p, now);
+        pk.available = false;
+        pk.readyAt = Number.MAX_SAFE_INTEGER; // one-time find
+        continue;
+      }
       if (pk.kind === "weapon") {
         this.giveWeapon(p, pk.what);
       } else {
@@ -1116,6 +1133,16 @@ export class Engine {
     p.weapons[slot] = weaponId;
     p.weaponId = weaponId;
     p.ammo[weaponId] = { mag: d.magSize, reserve: Math.min(d.reserveMax, d.magSize * 3) };
+  }
+
+  foundSkull(p: PlayerState, now: number) {
+    const all: SkullId[] = ["thrifty", "boom", "birthday", "famine", "sugar"];
+    const active = this.config.skulls || [];
+    const avail = all.filter((s) => !active.includes(s));
+    const pick = (avail.length ? avail : all)[Math.floor(this.rng() * (avail.length || all.length))];
+    this.config.skulls = [...active, pick];
+    this.pushFx("confetti", vadd(p.pos, v3(0, 1.4, 0)), p.team);
+    this.announce("SKULL FOUND", `${SKULL_NAMES[pick]} — now ON`, true);
   }
 
   givePowerup(p: PlayerState, id: PowerupId, now: number) {
@@ -1616,6 +1643,14 @@ const POWERUP_LABELS: Record<string, string> = {
   speed: "Definitely-Legal Speed Boost",
   damage: "Damage Boost (questionable)",
   camo: "Active Camo (mostly works)",
+};
+
+const SKULL_NAMES: Record<string, string> = {
+  thrifty: "Thrifty (no shields)",
+  boom: "Markdown Mayhem (everything explodes)",
+  birthday: "Grunt Birthday Party",
+  famine: "Famine (scarce ammo)",
+  sugar: "Sugar Rush (everyone's faster)",
 };
 
 // botThink is imported lazily to avoid a static import cycle.

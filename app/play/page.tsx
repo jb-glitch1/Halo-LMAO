@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Logo } from "@/components/Nav";
 import Lobby from "@/components/Lobby";
 import { getSocket, LobbyClient, HostSession, ClientSession, SessionLike } from "@/game/net";
-import type { RoomInfo, MatchConfig } from "@/game/types";
+import type { RoomInfo, MatchConfig, SkullId } from "@/game/types";
 import { MAP_LIST } from "@/game/maps";
 import { LOADOUTS } from "@/game/weapons";
 import { SPARTAN_COLORS } from "@/game/constants";
@@ -25,6 +25,13 @@ const MODES = [
   { id: "infection", name: "Black Friday", d: "Survive the horde" },
 ] as const;
 const SKILLS = [{ v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.78, n: "ODST" }, { v: 0.95, n: "Legendary" }];
+const SKULLS: { id: SkullId; name: string }[] = [
+  { id: "thrifty", name: "Thrifty" },
+  { id: "boom", name: "Markdown Mayhem" },
+  { id: "birthday", name: "Birthday Party" },
+  { id: "famine", name: "Famine" },
+  { id: "sugar", name: "Sugar Rush" },
+];
 function hexc(n: number) { return "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6); }
 
 export default function PlayPage() {
@@ -299,6 +306,24 @@ function SoloSetup({ onStart, onBack, initial }: { onStart: (c: MatchConfig) => 
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <div className="label mb-2">Skulls <span className="text-hud-amber/40 lowercase font-normal tracking-normal">— optional chaos modifiers</span></div>
+            <div className="flex flex-wrap gap-2">
+              {SKULLS.map((s) => {
+                const on = (cfg.skulls || []).includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => set({ skulls: on ? (cfg.skulls || []).filter((x) => x !== s.id) : [...(cfg.skulls || []), s.id] })}
+                    className={`px-2 py-1 rounded border text-xs ${on ? "border-temu-gold text-temu-gold bg-temu-gold/10" : "border-hud-line text-hud-amber/60 hover:text-hud-amber"}`}
+                  >
+                    💀 {s.name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-hud-amber/40 mt-1">Or find the hidden skull on the map mid-match to roll a random one.</p>
           </div>
           <button onClick={() => onStart(cfg)} className="btn-primary w-full text-lg !py-3.5">▶ Start Match</button>
         </div>
