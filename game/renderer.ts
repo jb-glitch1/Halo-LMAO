@@ -204,6 +204,10 @@ export class Renderer {
     this.resize();
   }
 
+  setFov(fov: number) {
+    this.baseFov = fov;
+  }
+
   resize() {
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;

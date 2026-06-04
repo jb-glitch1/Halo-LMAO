@@ -30,6 +30,16 @@ function fmtTime(ms: number) {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
+const SETTINGS_KEY = "lmao_settings";
+function loadSettings(): Record<string, any> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 export default function GameClient({ session, localId, online, isHost, onLeave, onReturnLobby, onReplay }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -43,10 +53,12 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const [endInfo, setEndInfo] = useState<{ winnerText: string; roster: ScoreRow[]; useTeams: boolean; teamScore: { red: number; blue: number } } | null>(null);
   const [scoreboard, setScoreboard] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [sens, setSens] = useState(2.3);
-  const [vol, setVol] = useState(0.7);
-  const [gfx, setGfx] = useState<GraphicsQuality>("high");
-  const [announcer, setAnnouncer] = useState<"cashier" | "infomercial" | "manager">("cashier");
+  const [sens, setSens] = useState<number>(() => loadSettings().sens ?? 2.3);
+  const [vol, setVol] = useState<number>(() => loadSettings().vol ?? 0.7);
+  const [gfx, setGfx] = useState<GraphicsQuality>(() => loadSettings().gfx ?? "high");
+  const [announcer, setAnnouncer] = useState<"cashier" | "infomercial" | "manager">(() => loadSettings().announcer ?? "cashier");
+  const [fov, setFov] = useState<number>(() => loadSettings().fov ?? 78);
+  const [invertY, setInvertY] = useState<boolean>(() => loadSettings().invertY ?? false);
   const liveRef = useRef(false);
 
   // event-dedupe + transient refs
@@ -161,6 +173,13 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   useEffect(() => { audio.setVolume(vol); }, [vol, audio]);
   useEffect(() => { rendererRef.current?.setQuality(gfx); }, [gfx]);
   useEffect(() => { audio.setAnnouncerStyle(announcer); }, [announcer, audio]);
+  useEffect(() => { rendererRef.current?.setFov(fov); }, [fov]);
+  useEffect(() => { imRef.current?.setInvertY(invertY); }, [invertY]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sens, vol, gfx, announcer, fov, invertY }));
+    } catch { /* storage unavailable */ }
+  }, [sens, vol, gfx, announcer, fov, invertY]);
 
   const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -387,6 +406,14 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
                   <label className="label">Volume: {Math.round(vol * 100)}%</label>
                   <input type="range" min={0} max={1} step={0.05} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} className="w-full" />
                 </div>
+                <div>
+                  <label className="label">Field of View: {fov}</label>
+                  <input type="range" min={70} max={100} step={1} value={fov} onChange={(e) => setFov(parseInt(e.target.value))} className="w-full" />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-hud-amber/70">
+                  <input type="checkbox" checked={invertY} onChange={(e) => setInvertY(e.target.checked)} />
+                  Invert look (Y axis)
+                </label>
                 <div>
                   <label className="label">Graphics</label>
                   <div className="grid grid-cols-3 gap-1 mt-1">
