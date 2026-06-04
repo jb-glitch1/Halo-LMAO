@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine } from "../engine";
+import { MAP_LIST } from "../maps";
 import * as C from "../constants";
 import type { MatchConfig, PlayerInput } from "../types";
 
@@ -131,4 +132,19 @@ test("wartrolley: board it, drive it, and splatter someone", () => {
   victim.spawnProtectUntil = 0;
   e.stepVehicles(1 / 60, 4600);
   assert.equal(victim.alive, false, "victim in the cart's path should be splattered");
+});
+
+test("every map boots players onto solid ground, in bounds, alive", () => {
+  assert.ok(MAP_LIST.length >= 4, "at least four arenas");
+  for (const m of MAP_LIST) {
+    const e = liveEngine(cfg({ mapId: m.id }), ["a", "b"]);
+    for (let i = 0; i < 30; i++) e.step(1 / 60, 4000 + i * 16);
+    assert.ok(m.spawns.length >= 4, `${m.id}: has spawns`);
+    for (const p of e.players.values()) {
+      assert.ok(p.alive, `${m.id}: player stays alive while idle`);
+      assert.ok(Number.isFinite(p.pos.y), `${m.id}: finite height`);
+      assert.ok(p.pos.y > C.FALL_KILL_Y, `${m.id}: did not fall into the void`);
+      assert.ok(Math.abs(p.pos.x) <= m.size && Math.abs(p.pos.z) <= m.size, `${m.id}: inside the playfield`);
+    }
+  }
 });

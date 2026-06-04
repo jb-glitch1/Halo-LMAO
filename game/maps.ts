@@ -304,10 +304,81 @@ function lattice(): MapDef {
   };
 }
 
+// =====================================================================
+// MAP 4 — Aisle Seven (tidy symmetric mid-size arena; "Midship on markdown")
+// =====================================================================
+function aisleSeven(): MapDef {
+  const S = 34;
+  const boxes: Box[] = [...perimeter(S, 9, 0x2c2f3a)];
+  const ramps: Ramp[] = [];
+
+  // central "register" platform with ramps up from both sides
+  boxes.push(box(0, 0, 12, 6, 2.6, 3.2, "platform", 0x3a4254));
+  ramps.push(slope(0, -6, 5, 6, "z", 1, 0, 2.6, 0x3a4254));
+  ramps.push(slope(0, 6, 5, 6, "z", -1, 0, 2.6, 0x3a4254));
+  boxes.push(box(-7, 0, 1.4, 1.4, 0, 4.5, "wall", 0x474f63));
+  boxes.push(box(7, 0, 1.4, 1.4, 0, 4.5, "wall", 0x474f63));
+
+  function base(side: 1 | -1, color: number, team: "red" | "blue") {
+    const bz = side * (S - 9);
+    boxes.push(box(0, bz, 14, 6, 2.2, 2.8, "base", color, team)); // roof / upper deck
+    ramps.push(slope(0, bz - side * 5, 5, 6, "z", side === 1 ? -1 : 1, 0, 2.2, color, team));
+    boxes.push(box(-7.5, bz, 1.2, 6, 0, 3.2, "base", color, team));
+    boxes.push(box(7.5, bz, 1.2, 6, 0, 3.2, "base", color, team));
+  }
+  base(-1, 0xff4d5e, "red");
+  base(1, 0x3aa0ff, "blue");
+
+  boxes.push(box(-15, -10, 4, 3, 0, 2.0, "crate", 0x5a4d3a));
+  boxes.push(box(15, 10, 4, 3, 0, 2.0, "crate", 0x5a4d3a));
+  boxes.push(box(-15, 10, 3, 3, 0, 1.6, "crate", 0x5a4d3a));
+  boxes.push(box(15, -10, 3, 3, 0, 1.6, "crate", 0x5a4d3a));
+
+  const jumpPads: JumpPad[] = [
+    { pos: v3(-15, 0, 0), radius: 2, power: 11 },
+    { pos: v3(15, 0, 0), radius: 2, power: 11 },
+  ];
+
+  const spawns: SpawnPoint[] = [
+    spawn(-5, -S + 11, 0, "red"), spawn(5, -S + 11, 0, "red"), spawn(0, -S + 13, 0, "red"), spawn(-8, -S + 9, 0.2, "red"),
+    spawn(-5, S - 11, Math.PI, "blue"), spawn(5, S - 11, Math.PI, "blue"), spawn(0, S - 13, Math.PI, "blue"), spawn(8, S - 9, Math.PI - 0.2, "blue"),
+    spawn(-16, 0, Math.PI / 2, "ffa"), spawn(16, 0, -Math.PI / 2, "ffa"), spawn(0, 18, Math.PI, "ffa"), spawn(0, -18, 0, "ffa"),
+  ];
+
+  const pickups: PickupSpawn[] = [
+    { id: "sniper_reg", kind: "weapon", what: "sniper", pos: v3(0, 3.2, 0), respawnMs: 60000 },
+    { id: "sword_n", kind: "weapon", what: "sword", pos: v3(0, 0, -15), respawnMs: 70000 },
+    { id: "rocket_s", kind: "weapon", what: "rocket", pos: v3(0, 0, 15), respawnMs: 90000 },
+    { id: "shotty_w", kind: "weapon", what: "shotgun", pos: v3(-16, 0, 0), respawnMs: 45000 },
+    { id: "shotty_e", kind: "weapon", what: "shotgun", pos: v3(16, 0, 0), respawnMs: 45000 },
+    { id: "over_reg", kind: "powerup", what: "overshield", pos: v3(0, 3.6, 0), respawnMs: 120000 },
+    { id: "speed_w", kind: "powerup", what: "speed", pos: v3(-20, 0, -14), respawnMs: 90000 },
+  ];
+
+  return {
+    id: "aisle",
+    name: "Aisle Seven",
+    blurb: "Two checkouts, one register, and a sniper nobody can afford. Tidy and symmetrical.",
+    size: S,
+    ambient: 0x4a5266,
+    fog: 0x44495a,
+    floorColor: 0x2a2f3a,
+    boxes,
+    ramps,
+    jumpPads,
+    spawns,
+    pickups,
+    hill: { pos: v3(0, 2.8, 0), radius: 4.5, moves: [v3(0, 2.8, 0), v3(-15, 0, -10), v3(15, 0, 10), v3(0, 0, -15), v3(0, 0, 15)] },
+    oddballSpawn: v3(0, 3.0, 0),
+    skullSpawn: v3(0, 0.5, 0),
+  };
+}
+
 export const MAPS: Record<string, MapDef> = {
   gulch: bargainGulch(),
   warehouse: warehouse(),
   lattice: lattice(),
+  aisle: aisleSeven(),
 };
 
 export const MAP_LIST = Object.values(MAPS);

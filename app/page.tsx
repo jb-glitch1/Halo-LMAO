@@ -80,8 +80,8 @@ export default function Home() {
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
             {[
               ["10", "Knockoff weapons"],
-              ["3", "Off-brand arenas"],
-              ["4", "Game modes"],
+              ["4", "Off-brand arenas"],
+              ["5", "Game modes"],
               ["16", "Players / room"],
             ].map(([n, l]) => (
               <div key={l} className="panel py-4 px-3 bg-black/30">
@@ -163,7 +163,7 @@ export default function Home() {
 
       {/* MAPS */}
       <section className="max-w-6xl mx-auto px-4 py-12">
-        <h2 className="text-3xl font-extrabold mb-6 text-center">Three <span className="text-temu-orange">Arenas</span></h2>
+        <h2 className="text-3xl font-extrabold mb-6 text-center">Four <span className="text-temu-orange">Arenas</span></h2>
         <div className="grid sm:grid-cols-3 gap-4">
           {MAP_LIST.map((m, i) => (
             <div key={m.id} className="panel overflow-hidden group">
