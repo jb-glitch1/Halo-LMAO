@@ -4,8 +4,20 @@ import { Engine } from "../engine";
 import "../bots"; // side-effect: registers the bot brain with the engine
 import { MAP_LIST } from "../maps";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
+import { raycastWorld } from "../physics";
+import { v3, dirFromAngles } from "../vec";
 import * as C from "../constants";
 import type { MatchConfig, PlayerInput } from "../types";
+
+function prng(seed: number) {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 // The simulation is framework-free (no DOM / Three), so it runs headless in Node.
 // These tests are the ground truth for game behavior since the renderer can't be
@@ -198,6 +210,22 @@ test("ctf: grabbing the enemy banner and carrying it home scores a capture", () 
   e.stepCtf(1 / 60, 4001);
   assert.equal(e.teamScore.red, before + 1, "red scores a capture");
   assert.equal(flags.blue.carrier, null, "blue banner returns after the capture");
+});
+
+test("raycast broadphase matches the exhaustive result on every map", () => {
+  const rnd = prng(0x1234abcd);
+  for (const m of MAP_LIST) {
+    for (let i = 0; i < 250; i++) {
+      const origin = v3((rnd() * 2 - 1) * m.size, rnd() * 9, (rnd() * 2 - 1) * m.size);
+      const dir = dirFromAngles(rnd() * Math.PI * 2, (rnd() - 0.5) * Math.PI * 0.98);
+      const dist = 4 + rnd() * 120;
+      const fast = raycastWorld(origin, dir, dist, m);
+      const slow = raycastWorld(origin, dir, dist, m, true);
+      const ft = fast ? Math.round(fast.t * 1e5) : -1;
+      const st = slow ? Math.round(slow.t * 1e5) : -1;
+      assert.equal(ft, st, `${m.id} ray ${i}: broadphase ${ft} vs exhaustive ${st}`);
+    }
+  }
 });
 
 test("every map boots players onto solid ground, in bounds, alive", () => {

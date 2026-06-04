@@ -255,23 +255,63 @@ function rampBox(r: Ramp): { min: Vec3; max: Vec3 } {
   return { min: { ...r.min, y: r.baseY }, max: { ...r.max, y: r.topY } };
 }
 
+// Precomputed collider (box + bounding sphere) for raycast broadphase.
+interface Collider {
+  min: Vec3;
+  max: Vec3;
+  cx: number;
+  cy: number;
+  cz: number;
+  r: number;
+}
+
+// Build (once per map) the flattened collider list with bounding spheres so the
+// hot raycast path skips far/off-axis colliders and never re-allocates ramp boxes.
+const colliderCache = new WeakMap<MapDef, Collider[]>();
+function colliders(map: MapDef): Collider[] {
+  let list = colliderCache.get(map);
+  if (list) return list;
+  list = [];
+  const add = (min: Vec3, max: Vec3) => {
+    const cx = (min.x + max.x) / 2;
+    const cy = (min.y + max.y) / 2;
+    const cz = (min.z + max.z) / 2;
+    const r = Math.hypot(max.x - cx, max.y - cy, max.z - cz);
+    list!.push({ min, max, cx, cy, cz, r });
+  };
+  for (const b of map.boxes) add(b.min, b.max);
+  for (const rmp of map.ramps) {
+    const rb = rampBox(rmp);
+    add(rb.min, rb.max);
+  }
+  colliderCache.set(map, list);
+  return list;
+}
+
+// Nearest world hit along a (unit-direction) ray. `exhaustive` disables the
+// bounding-sphere broadphase — used only by tests to verify parity.
 export function raycastWorld(
   origin: Vec3,
   dir: Vec3,
   maxDist: number,
   map: MapDef,
+  exhaustive = false,
 ): RayHit | null {
   let best: RayHit | null = null;
   let bestT = maxDist;
-  for (const b of map.boxes) {
-    const h = rayBox(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, b);
-    if (h && h.t < bestT) {
-      bestT = h.t;
-      best = h;
+  for (const c of colliders(map)) {
+    if (!exhaustive) {
+      // bounding-sphere reject (conservative; assumes |dir| ≈ 1)
+      const ox = c.cx - origin.x;
+      const oy = c.cy - origin.y;
+      const oz = c.cz - origin.z;
+      const tca = ox * dir.x + oy * dir.y + oz * dir.z;
+      if (tca < -c.r) continue; // sphere entirely behind the origin
+      if (tca - c.r > bestT) continue; // sphere beyond the current nearest hit
+      const d2 = ox * ox + oy * oy + oz * oz - tca * tca;
+      if (d2 > c.r * c.r) continue; // ray line misses the bounding sphere
     }
-  }
-  for (const r of map.ramps) {
-    const h = rayBox(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, rampBox(r));
+    const h = rayBox(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, c);
     if (h && h.t < bestT) {
       bestT = h.t;
       best = h;
