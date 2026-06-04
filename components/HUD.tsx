@@ -48,6 +48,8 @@ export interface HudModel {
   roster: ScoreRow[];
   fps: number;
   connecting?: boolean;
+  driving?: { seat: "driver" | "gunner" };
+  infection?: { role: "survivor" | "infected"; survivorsLeft: number };
 }
 
 const WEAPON_ICON: Record<string, string> = {
@@ -99,6 +101,15 @@ export default function HUD({ m }: { m: HudModel }) {
           <div className="panel2 px-3 py-0.5 text-xs">
             {m.hill && (m.hill.controller ? <span style={{ color: teamCss(m.hill.controller) }}>● {m.hill.controller.toUpperCase()} controls the hill</span> : <span className="text-hud-amber/60">hill is contested</span>)}
             {m.oddball && (m.oddball.carrier ? <span className={m.oddball.mine ? "text-hud-green" : "text-hud-amber/80"}>💀 {m.oddball.mine ? "You have the ball!" : m.oddball.carrier + " has the ball"}</span> : <span className="text-hud-amber/60">💀 ball is loose</span>)}
+          </div>
+        )}
+        {m.infection && (
+          <div className="panel2 px-3 py-0.5 text-xs">
+            {m.infection.role === "infected" ? (
+              <span className="text-hud-green">🧟 INFECTED — go acquire some value</span>
+            ) : (
+              <span className="text-hud-cyan">🛡️ SURVIVOR — {m.infection.survivorsLeft} left · don&apos;t get caught</span>
+            )}
           </div>
         )}
       </div>
@@ -162,6 +173,15 @@ export default function HUD({ m }: { m: HudModel }) {
 
       {/* ---- bottom-right: ammo + grenades ---- */}
       <div className="absolute bottom-3 right-3 text-right">
+        {m.driving ? (
+          <div className="panel2 px-3 py-2 inline-block text-left">
+            <div className="text-[10px] uppercase tracking-widest text-temu-orange">🛒 Wartrolley</div>
+            <div className="text-2xl font-extrabold text-hud-amber leading-tight">TROLLEY CANNON</div>
+            <div className="text-xs text-hud-amber/60 mt-1">
+              <kbd className="text-hud-cyan font-bold">E</kbd> dismount · fire to shoot · ram to splatter
+            </div>
+          </div>
+        ) : (
         <div className="panel2 px-3 py-2 inline-block">
           <div className="text-[10px] uppercase tracking-widest text-hud-amber/60 truncate max-w-[200px]" style={{ color: m.weaponColor }}>
             {WEAPON_ICON[Object.keys(WEAPON_ICON).find((k) => m.weaponName.toLowerCase().includes(k)) || ""] || "🔫"} {m.weaponName}
@@ -185,6 +205,7 @@ export default function HUD({ m }: { m: HudModel }) {
             <span className={m.grenadeType === "plasma" ? "text-hud-cyan font-bold" : "text-hud-amber/50"}>🔵 {m.grenades.plasma}</span>
           </div>
         </div>
+        )}
         {/* powerups */}
         {m.powerups.length > 0 && (
           <div className="flex flex-col items-end gap-1 mt-2">

@@ -320,6 +320,10 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       roster,
       fps: fpsRef.current.fps,
       connecting: online && !isHost && !self,
+      driving: self?.vehicleId ? { seat: self.vehicleSeat || "driver" } : undefined,
+      infection: snap.mode === "infection"
+        ? { role: self?.infected ? "infected" : "survivor", survivorsLeft: snap.players.filter((p) => !p.infected).length }
+        : undefined,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localId, online, isHost, session, audio]);
