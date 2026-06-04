@@ -138,6 +138,7 @@ export class Renderer {
   shakeUntil = 0;
   shakeMag = 0;
   damageDir = 0;
+  reduceMotion = false;
 
   private geoCache = new Map<string, THREE.BufferGeometry>();
   private matCache = new Map<string, THREE.Material>();
@@ -206,6 +207,10 @@ export class Renderer {
 
   setFov(fov: number) {
     this.baseFov = fov;
+  }
+
+  setReduceMotion(v: boolean) {
+    this.reduceMotion = v;
   }
 
   resize() {
@@ -1002,8 +1007,8 @@ export class Renderer {
     this.camera.rotation.y = local.yaw;
     this.camera.rotation.x = local.pitch;
 
-    // shake
-    if (now < this.shakeUntil) {
+    // shake (suppressed when the player prefers reduced motion)
+    if (now < this.shakeUntil && !this.reduceMotion) {
       const s = this.shakeMag * ((this.shakeUntil - now) / 350);
       this.camera.position.x += (Math.random() - 0.5) * s;
       this.camera.position.y += (Math.random() - 0.5) * s;
@@ -1027,10 +1032,11 @@ export class Renderer {
     this.bobT += dt * (Math.hypot(local.vel.x, local.vel.z) > 1 ? 9 : 2);
     if (this.vmWeapon) {
       const recoil = local.firing ? 0.03 : 0;
-      this.vmWeapon.position.y = VM_BASE.y + Math.sin(this.bobT) * 0.012;
-      this.vmWeapon.position.x = VM_BASE.x + Math.cos(this.bobT * 0.5) * 0.008;
+      const bob = this.reduceMotion ? 0.25 : 1;
+      this.vmWeapon.position.y = VM_BASE.y + Math.sin(this.bobT) * 0.012 * bob;
+      this.vmWeapon.position.x = VM_BASE.x + Math.cos(this.bobT * 0.5) * 0.008 * bob;
       this.vmWeapon.position.z = VM_BASE.z + recoil;
-      this.vmWeapon.rotation.z = Math.sin(this.bobT * 0.5) * 0.01;
+      this.vmWeapon.rotation.z = Math.sin(this.bobT * 0.5) * 0.01 * bob;
       this.vmWeapon.rotation.x = recoil * 0.6;
     }
     if (this.vmFlash) {

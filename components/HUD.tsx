@@ -51,6 +51,7 @@ export interface HudModel {
   driving?: { seat: "driver" | "gunner" };
   infection?: { role: "survivor" | "infected"; survivorsLeft: number };
   damageDir?: number | null; // bearing to last attacker (rad, 0 = ahead), null = hide
+  colorblind?: boolean; // shape-code radar blips instead of relying on color
 }
 
 const WEAPON_ICON: Record<string, string> = {
@@ -165,7 +166,7 @@ export default function HUD({ m }: { m: HudModel }) {
 
       {/* ---- bottom-left: radar + shield/health ---- */}
       <div className="absolute bottom-3 left-3 flex flex-col gap-2">
-        <Radar radar={m.radar} alive={m.alive} />
+        <Radar radar={m.radar} alive={m.alive} colorblind={m.colorblind} />
         <div className="w-56">
           {/* shield */}
           <div className="h-2.5 bg-black/50 rounded-sm overflow-hidden border border-hud-line mb-1 relative">
@@ -285,7 +286,7 @@ function ScopeOverlay() {
   );
 }
 
-function Radar({ radar, alive }: { radar: HudModel["radar"]; alive: boolean }) {
+function Radar({ radar, alive, colorblind }: { radar: HudModel["radar"]; alive: boolean; colorblind?: boolean }) {
   return (
     <div className="relative w-32 h-32 rounded-full panel2 overflow-hidden" style={{ opacity: alive ? 1 : 0.4 }}>
       <div className="absolute inset-0 rounded-full" style={{ background: "radial-gradient(circle, rgba(54,231,255,0.08), transparent 70%)" }} />
@@ -296,13 +297,17 @@ function Radar({ radar, alive }: { radar: HudModel["radar"]; alive: boolean }) {
       <div className="absolute inset-0 animate-spin" style={{ animationDuration: "4s", background: "conic-gradient(from 0deg, rgba(54,231,255,0.18), transparent 60deg)" }} />
       {/* self */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0" style={{ borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderBottom: "8px solid #5dff9b" }} />
-      {radar.blips.map((b, i) => (
-        <div key={i} className="absolute w-2 h-2 rounded-full" style={{
-          left: `${50 + b.x * 48}%`, top: `${50 + b.y * 48}%`, transform: "translate(-50%,-50%)",
-          background: b.enemy ? "#ff4d5e" : "#3aa0ff", boxShadow: `0 0 5px ${b.enemy ? "#ff4d5e" : "#3aa0ff"}`,
-          outline: b.up ? "2px solid rgba(255,255,255,0.5)" : "none",
-        }} />
-      ))}
+      {radar.blips.map((b, i) => {
+        const diamond = colorblind && b.enemy; // shape-code enemies for colorblind play
+        return (
+          <div key={i} className={`absolute w-2 h-2 ${diamond ? "" : "rounded-full"}`} style={{
+            left: `${50 + b.x * 48}%`, top: `${50 + b.y * 48}%`,
+            transform: `translate(-50%,-50%)${diamond ? " rotate(45deg)" : ""}`,
+            background: b.enemy ? "#ff4d5e" : "#3aa0ff", boxShadow: `0 0 5px ${b.enemy ? "#ff4d5e" : "#3aa0ff"}`,
+            outline: b.up ? "2px solid rgba(255,255,255,0.5)" : "none",
+          }} />
+        );
+      })}
       <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] text-hud-amber/40 uppercase tracking-widest">motion</div>
     </div>
   );

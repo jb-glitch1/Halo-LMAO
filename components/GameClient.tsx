@@ -59,6 +59,9 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const [announcer, setAnnouncer] = useState<"cashier" | "infomercial" | "manager">(() => loadSettings().announcer ?? "cashier");
   const [fov, setFov] = useState<number>(() => loadSettings().fov ?? 78);
   const [invertY, setInvertY] = useState<boolean>(() => loadSettings().invertY ?? false);
+  const [reduceMotion, setReduceMotion] = useState<boolean>(() => loadSettings().reduceMotion ?? (typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches));
+  const [colorblind, setColorblind] = useState<boolean>(() => loadSettings().colorblind ?? false);
+  const colorblindRef = useRef(colorblind);
   const liveRef = useRef(false);
 
   // event-dedupe + transient refs
@@ -176,11 +179,13 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   useEffect(() => { audio.setAnnouncerStyle(announcer); }, [announcer, audio]);
   useEffect(() => { rendererRef.current?.setFov(fov); }, [fov]);
   useEffect(() => { imRef.current?.setInvertY(invertY); }, [invertY]);
+  useEffect(() => { rendererRef.current?.setReduceMotion(reduceMotion); }, [reduceMotion]);
+  useEffect(() => { colorblindRef.current = colorblind; }, [colorblind]);
   useEffect(() => {
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sens, vol, gfx, announcer, fov, invertY }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sens, vol, gfx, announcer, fov, invertY, reduceMotion, colorblind }));
     } catch { /* storage unavailable */ }
-  }, [sens, vol, gfx, announcer, fov, invertY]);
+  }, [sens, vol, gfx, announcer, fov, invertY, reduceMotion, colorblind]);
 
   const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -364,6 +369,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
         ? { role: self?.infected ? "infected" : "survivor", survivorsLeft: snap.players.filter((p) => !p.infected).length }
         : undefined,
       damageDir: dmgDir.current && now - dmgDir.current.ts < 1100 ? dmgDir.current.ang : null,
+      colorblind: colorblindRef.current,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localId, online, isHost, session, audio]);
@@ -439,6 +445,14 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
                 <label className="flex items-center gap-2 text-sm text-hud-amber/70">
                   <input type="checkbox" checked={invertY} onChange={(e) => setInvertY(e.target.checked)} />
                   Invert look (Y axis)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-hud-amber/70">
+                  <input type="checkbox" checked={reduceMotion} onChange={(e) => setReduceMotion(e.target.checked)} />
+                  Reduce motion (less screen shake)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-hud-amber/70">
+                  <input type="checkbox" checked={colorblind} onChange={(e) => setColorblind(e.target.checked)} />
+                  Colorblind radar (shapes)
                 </label>
                 <div>
                   <label className="label">Graphics</label>
