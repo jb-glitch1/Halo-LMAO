@@ -190,6 +190,24 @@ test("bots board and drive an idle Wartrolley", () => {
   assert.ok(Math.hypot(cart.pos.x - sx, cart.pos.z - sz) > 1, "bot should drive it somewhere");
 });
 
+test("spawning never drops you on top of a living enemy", () => {
+  const e = new Engine(cfg({ mode: "slayer", mapId: "aisle" }));
+  e.addPlayer("a", { name: "a", team: "ffa", isBot: false });
+  e.addPlayer("enemy", { name: "enemy", team: "ffa", isBot: false });
+  e.start(0);
+  e.step(1 / 60, 4000);
+  const enemy = e.players.get("enemy")!;
+  const target = e.map.spawns[0];
+  enemy.pos = { ...target.pos };
+  enemy.alive = true;
+  let onTop = 0;
+  for (let i = 0; i < 40; i++) {
+    const sp = e.pickSpawn("ffa");
+    if (Math.hypot(sp.pos.x - target.pos.x, sp.pos.z - target.pos.z) < 0.01) onTop++;
+  }
+  assert.equal(onTop, 0, "the enemy-occupied spawn is never chosen");
+});
+
 test("ctf: grabbing the enemy banner and carrying it home scores a capture", () => {
   const e = new Engine(cfg({ mode: "ctf", scoreLimit: 3 }));
   e.addPlayer("r", { name: "r", team: "red", isBot: false });

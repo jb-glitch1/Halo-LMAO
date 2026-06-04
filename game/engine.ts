@@ -312,7 +312,8 @@ export class Engine {
 
   // ---------------- spawning ----------------
   spawnPlayer(p: PlayerState, now: number, initial: boolean) {
-    const sp = this.pickSpawn(p.team);
+    const deathSpot = initial ? undefined : { x: p.pos.x, y: p.pos.y, z: p.pos.z };
+    const sp = this.pickSpawn(p.team, deathSpot);
     p.pos = { ...sp.pos };
     p.pos.y = supportHeight(sp.pos.x, sp.pos.z, C.PLAYER_RADIUS, sp.pos.y + 0.5, this.map);
     p.vel = v3(0, 0, 0);
@@ -360,31 +361,42 @@ export class Engine {
     this.pushFx("spawn", p.pos, p.team);
   }
 
-  pickSpawn(team: Team) {
+  pickSpawn(team: Team, avoid?: Vec3) {
     const pool = this.map.spawns.filter(
       (s) => s.team === team || (team === "ffa" ? true : s.team === "ffa"),
     );
     const usable = pool.length ? pool : this.map.spawns;
-    // farthest from nearest living enemy
     let best = usable[0];
     let bestScore = -Infinity;
     for (const s of usable) {
       let nearest = Infinity;
+      let seen = false;
       for (const o of this.players.values()) {
         if (!o.alive) continue;
-        if (this.sameTeam(team, o.team) && team !== "ffa") continue;
-        if (team === "ffa" && o.team === "ffa") {
-          // any other player counts in ffa
-        }
-        nearest = Math.min(nearest, vdist(s.pos, o.pos));
+        if (this.sameTeam(team, o.team) && team !== "ffa") continue; // ignore allies
+        const d = vdist(s.pos, o.pos);
+        nearest = Math.min(nearest, d);
+        if (d < 42 && this.hasLineOfSight(s.pos, o.pos)) seen = true;
       }
-      const score = (nearest === Infinity ? 999 : nearest) + this.rng() * 6;
+      let score = nearest === Infinity ? 200 : nearest;
+      if (seen) score -= 60; // strongly avoid spawns an enemy can already see
+      if (avoid) score += Math.min(18, vdist(s.pos, avoid)); // get away from where you just died
+      score += this.rng() * 5;
       if (score > bestScore) {
         bestScore = score;
         best = s;
       }
     }
     return best;
+  }
+
+  hasLineOfSight(a: Vec3, b: Vec3): boolean {
+    const from = v3(a.x, a.y + C.PLAYER_EYE, a.z);
+    const dx = b.x - from.x, dy = b.y + 1.0 - from.y, dz = b.z - from.z;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist < 0.5) return true;
+    const w = raycastWorld(from, { x: dx / dist, y: dy / dist, z: dz / dist }, dist - 0.3, this.map);
+    return !w || w.t >= dist - 0.4;
   }
 
   sameTeam(a: Team, b: Team) {
