@@ -132,8 +132,21 @@ export class AudioEngine {
     return buf;
   }
 
+  // Route a per-sound bus through a stereo panner (-1 left … +1 right).
+  private connectPanned(node: AudioNode, pan: number) {
+    if (!this.sfxGain) return;
+    if (pan && this.ctx?.createStereoPanner) {
+      const p = this.ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      node.connect(p);
+      p.connect(this.sfxGain);
+    } else {
+      node.connect(this.sfxGain);
+    }
+  }
+
   // ---------- weapon sounds ----------
-  weapon(weaponId: string, dist = 0) {
+  weapon(weaponId: string, dist = 0, pan = 0) {
     this.ensure();
     if (!this.ctx || !this.sfxGain) return;
     const ctx = this.ctx;
@@ -141,7 +154,7 @@ export class AudioEngine {
     const atten = Math.max(0.12, 1 - dist / 70);
     const out = ctx.createGain();
     out.gain.value = atten;
-    out.connect(this.sfxGain);
+    this.connectPanned(out, pan);
 
     const tone = (freq: number, type: OscillatorType, peak: number, dur: number, slideTo?: number) => {
       const o = ctx.createOscillator();
@@ -215,14 +228,14 @@ export class AudioEngine {
   }
 
   // ---------- generic sfx ----------
-  sfx(name: string, dist = 0) {
+  sfx(name: string, dist = 0, pan = 0) {
     this.ensure();
     if (!this.ctx || !this.sfxGain) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime;
     const out = ctx.createGain();
     out.gain.value = Math.max(0.1, 1 - dist / 60);
-    out.connect(this.sfxGain);
+    this.connectPanned(out, pan);
     const tone = (freq: number, type: OscillatorType, peak: number, dur: number, slideTo?: number) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();

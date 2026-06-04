@@ -129,7 +129,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
 
       if (snap) {
         renderer.applySnapshot(snap, localId, session.localTeam);
-        processEvents(snap, local.pos, now);
+        processEvents(snap, local, now);
         if (snap.phase === "live" && !liveRef.current) {
           liveRef.current = true;
           audio.ambience(false); // cut the choir when the fight starts
@@ -185,22 +185,31 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
-  const processEvents = useCallback((snap: Snapshot, camPos: { x: number; y: number; z: number }, now: number) => {
+  const processEvents = useCallback((snap: Snapshot, local: { pos: { x: number; y: number; z: number }; yaw: number }, now: number) => {
+    const camPos = local.pos;
+    const cy = Math.cos(local.yaw), sy = Math.sin(local.yaw);
+    // left/right pan of a world point relative to where we're looking
+    const panOf = (p: { x: number; z: number }) => {
+      const dx = p.x - camPos.x, dz = p.z - camPos.z;
+      const dh = Math.hypot(dx, dz) || 1;
+      return Math.max(-1, Math.min(1, (dx * cy + dz * -sy) / dh)) * 0.85;
+    };
     // fx sounds
     for (const fx of snap.fx) {
       if (fx.id <= lastFx.current) continue;
       const d = dist(camPos, fx.pos);
+      const pan = panOf(fx.pos);
       switch (fx.kind) {
-        case "muzzle": if (fx.weapon) audio.weapon(fx.weapon, d); break;
-        case "explosion": audio.sfx("explosion", d); break;
-        case "shieldpop": audio.sfx("shieldbreak", d); break;
-        case "melee": audio.weapon("sword", d); break;
-        case "lift": audio.sfx("lift", d); break;
-        case "pickup": audio.sfx("pickup", d); break;
+        case "muzzle": if (fx.weapon) audio.weapon(fx.weapon, d, pan); break;
+        case "explosion": audio.sfx("explosion", d, pan); break;
+        case "shieldpop": audio.sfx("shieldbreak", d, pan); break;
+        case "melee": audio.weapon("sword", d, pan); break;
+        case "lift": audio.sfx("lift", d, pan); break;
+        case "pickup": audio.sfx("pickup", d, pan); break;
         case "spawn": if (d < 4) audio.sfx("spawn", 0); break;
-        case "death": audio.sfx("death", d); break;
-        case "splatter": audio.sfx("splatter", d); break;
-        case "confetti": audio.sfx("confetti", d); break;
+        case "death": audio.sfx("death", d, pan); break;
+        case "splatter": audio.sfx("splatter", d, pan); break;
+        case "confetti": audio.sfx("confetti", d, pan); break;
       }
     }
     if (snap.fx.length) lastFx.current = Math.max(lastFx.current, snap.fx[snap.fx.length - 1].id);
