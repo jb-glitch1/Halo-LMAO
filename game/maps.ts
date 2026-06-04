@@ -386,3 +386,101 @@ export const MAP_LIST = Object.values(MAPS);
 export function getMap(id: string): MapDef {
   return MAPS[id] || MAPS.gulch;
 }
+
+// Register a (e.g. generated) map so getMap can resolve it for the match.
+export function registerMap(m: MapDef): MapDef {
+  MAPS[m.id] = m;
+  return m;
+}
+
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// =====================================================================
+// PROCEDURAL — "Bargain Bin Generator": a fresh symmetric arena per seed.
+// Cover is mirrored across the centre and kept clear of spawns, so the
+// result is always balanced and playable.
+// =====================================================================
+const GEN_PALETTES = [
+  { ambient: 0x6a7a55, fog: 0x9fb88a, floor: 0x55683f }, // meadow
+  { ambient: 0x4a5266, fog: 0x44495a, floor: 0x2a2f3a }, // warehouse
+  { ambient: 0x5a4a7a, fog: 0x2a2440, floor: 0x191326 }, // dusk
+];
+
+export function generateMap(seed: number): MapDef {
+  const rnd = mulberry32(seed);
+  const S = Math.round(30 + rnd() * 14);
+  const boxes: Box[] = [...perimeter(S, 8, 0x2b2f3a)];
+  const ramps: Ramp[] = [];
+
+  let platTop = 0;
+  if (rnd() < 0.75) {
+    platTop = 2 + rnd() * 1.4;
+    boxes.push(box(0, 0, 8, 8, platTop, platTop + 0.6, "platform", 0x3a4254));
+    ramps.push(slope(0, -5, 4, 5, "z", 1, 0, platTop, 0x3a4254));
+    ramps.push(slope(0, 5, 4, 5, "z", -1, 0, platTop, 0x3a4254));
+  }
+
+  const spawns: SpawnPoint[] = [];
+  const sp: { x: number; z: number }[] = [];
+  const addSpawn = (x: number, z: number, yaw: number, team: SpawnPoint["team"]) => {
+    spawns.push(spawn(x, z, yaw, team));
+    sp.push({ x, z });
+  };
+  for (const dx of [-7, -2, 3, 8]) addSpawn(dx, -S + 6, 0, "red");
+  for (const dx of [-8, -3, 2, 7]) addSpawn(dx, S - 6, Math.PI, "blue");
+  addSpawn(-S + 6, 0, Math.PI / 2, "ffa");
+  addSpawn(S - 6, 0, -Math.PI / 2, "ffa");
+
+  const colors = [0x556070, 0x5a4d3a, 0x6b6f5a, 0x44506a];
+  const clear = (x: number, z: number) =>
+    Math.hypot(x, z) > 5.5 && !sp.some((s) => Math.hypot(s.x - x, s.z - z) < 5.5);
+  const pairs = 5 + Math.floor(rnd() * 4);
+  for (let i = 0; i < pairs; i++) {
+    const x = (rnd() * 2 - 1) * (S - 10);
+    const z = rnd() * (S - 14);
+    const w = 2 + rnd() * 3;
+    const d = 2 + rnd() * 3;
+    const h = 1.2 + rnd() * 2;
+    const c = colors[Math.floor(rnd() * colors.length)];
+    if (clear(x, z)) boxes.push(box(x, z, w, d, 0, h, "crate", c));
+    if (clear(x, -z)) boxes.push(box(x, -z, w, d, 0, h, "crate", c)); // mirror for balance
+  }
+
+  const jumpPads: JumpPad[] = platTop > 0 ? [{ pos: v3(-S + 9, 0, 0), radius: 2, power: 11 }, { pos: v3(S - 9, 0, 0), radius: 2, power: 11 }] : [];
+
+  const pickups: PickupSpawn[] = [
+    { id: "g_sniper", kind: "weapon", what: "sniper", pos: v3(0, platTop, 0), respawnMs: 60000 },
+    { id: "g_rocket", kind: "weapon", what: "rocket", pos: v3(-S + 9, 0, -8), respawnMs: 90000 },
+    { id: "g_sword", kind: "weapon", what: "sword", pos: v3(S - 9, 0, 8), respawnMs: 75000 },
+    { id: "g_shotty", kind: "weapon", what: "shotgun", pos: v3(0, 0, -S + 12), respawnMs: 45000 },
+    { id: "g_over", kind: "powerup", what: "overshield", pos: v3(0, platTop, S - 12), respawnMs: 120000 },
+  ];
+
+  const pal = GEN_PALETTES[Math.floor(rnd() * GEN_PALETTES.length)];
+  return {
+    id: "gen_" + (seed >>> 0).toString(36),
+    name: "Bargain Bin #" + ((seed >>> 0) % 1000),
+    blurb: "A procedurally value-engineered arena. Layout assembled while you waited.",
+    size: S,
+    ambient: pal.ambient,
+    fog: pal.fog,
+    floorColor: pal.floor,
+    boxes,
+    ramps,
+    jumpPads,
+    spawns,
+    pickups,
+    hill: { pos: v3(0, platTop, 0), radius: 4.5, moves: [v3(0, platTop, 0), v3(-S + 10, 0, 0), v3(S - 10, 0, 0)] },
+    oddballSpawn: v3(0, platTop + 0.2, 0),
+    vehicleSpawns: S > 38 ? [{ pos: v3(-S + 12, 0, 10), yaw: Math.PI / 2 }, { pos: v3(S - 12, 0, -10), yaw: -Math.PI / 2 }] : undefined,
+    skullSpawn: v3(0, platTop, 0),
+  };
+}

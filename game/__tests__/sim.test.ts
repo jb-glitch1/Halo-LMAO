@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine, GUN_LADDER } from "../engine";
 import "../bots"; // side-effect: registers the bot brain with the engine
-import { MAP_LIST } from "../maps";
+import { MAP_LIST, generateMap, registerMap } from "../maps";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
 import { raycastWorld } from "../physics";
 import { v3, dirFromAngles } from "../vec";
@@ -292,6 +292,23 @@ test("raycast broadphase matches the exhaustive result on every map", () => {
       const ft = fast ? Math.round(fast.t * 1e5) : -1;
       const st = slow ? Math.round(slow.t * 1e5) : -1;
       assert.equal(ft, st, `${m.id} ray ${i}: broadphase ${ft} vs exhaustive ${st}`);
+    }
+  }
+});
+
+test("generated arenas are valid: spawns present, players land on ground, in bounds", () => {
+  for (let s = 1; s <= 14; s++) {
+    const m = registerMap(generateMap(s * 1337 + 7));
+    assert.ok(m.spawns.length >= 8, `${m.id} has enough spawns`);
+    const e = new Engine(cfg({ mapId: m.id }));
+    e.addPlayer("a", { name: "a", team: "red", isBot: false });
+    e.addPlayer("b", { name: "b", team: "blue", isBot: false });
+    e.start(0);
+    for (let i = 0; i < 30; i++) e.step(1 / 60, 4000 + i * 16);
+    for (const p of e.players.values()) {
+      assert.ok(p.alive, `${m.id}: player stays alive`);
+      assert.ok(Number.isFinite(p.pos.y) && p.pos.y > C.FALL_KILL_Y, `${m.id}: not in the void`);
+      assert.ok(Math.abs(p.pos.x) <= m.size + 1 && Math.abs(p.pos.z) <= m.size + 1, `${m.id}: in bounds`);
     }
   }
 });

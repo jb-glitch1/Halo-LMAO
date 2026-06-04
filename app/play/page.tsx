@@ -5,7 +5,7 @@ import { Logo } from "@/components/Nav";
 import Lobby from "@/components/Lobby";
 import { getSocket, LobbyClient, HostSession, ClientSession, SessionLike } from "@/game/net";
 import type { RoomInfo, MatchConfig, SkullId } from "@/game/types";
-import { MAP_LIST } from "@/game/maps";
+import { MAP_LIST, generateMap, registerMap } from "@/game/maps";
 import { LOADOUTS } from "@/game/weapons";
 import { SPARTAN_COLORS } from "@/game/constants";
 
@@ -284,6 +284,12 @@ function SoloSetup({ onStart, onBack, initial }: { onStart: (c: MatchConfig) => 
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => { const g = registerMap(generateMap(Date.now())); set({ mapId: g.id }); }}
+              className={`mt-2 w-full p-2 rounded-lg border text-sm ${cfg.mapId.startsWith("gen_") ? "border-temu-gold bg-temu-gold/10 text-temu-gold" : "border-hud-line text-hud-amber/70 hover:text-hud-amber"}`}
+            >
+              🎲 {cfg.mapId.startsWith("gen_") ? "Random arena ready — roll again" : "Generate a Random Arena"}
+            </button>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
