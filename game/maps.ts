@@ -374,11 +374,75 @@ function aisleSeven(): MapDef {
   };
 }
 
+// =====================================================================
+// MAP 5 — Loading Dock (a central "trailer" you fight around and on top of)
+// =====================================================================
+function loadingDock(): MapDef {
+  const S = 28;
+  const boxes: Box[] = [...perimeter(S, 8, 0x2e2a24)];
+  const ramps: Ramp[] = [];
+
+  // central trailer: a long box you flank around, with a walkable roof deck
+  boxes.push(box(0, 0, 7, 16, 0, 3.2, "crate", 0x6a5a3a));
+  boxes.push(box(0, 0, 7, 16, 3.2, 3.8, "platform", 0x4a4030));
+  ramps.push(slope(6.5, 0, 4, 6, "x", -1, 0, 3.2, 0x4a4030)); // ramp up the +x flank
+
+  // raised loading platforms at each end
+  boxes.push(box(0, -S + 5, 18, 4, 1.2, 1.8, "platform", 0x3a4250));
+  boxes.push(box(0, S - 5, 18, 4, 1.2, 1.8, "platform", 0x3a4250));
+  ramps.push(slope(-11, -S + 5, 4, 4, "z", 1, 0, 1.2, 0x3a4250));
+  ramps.push(slope(11, S - 5, 4, 4, "z", -1, 0, 1.2, 0x3a4250));
+
+  boxes.push(box(-11, 0, 3, 3, 0, 2.0, "crate", 0x5a4d3a));
+  boxes.push(box(11, 0, 3, 3, 0, 2.0, "crate", 0x5a4d3a));
+  boxes.push(box(-S + 6, -9, 3, 3, 0, 1.8, "crate", 0x5a4d3a));
+  boxes.push(box(S - 6, 9, 3, 3, 0, 1.8, "crate", 0x5a4d3a));
+
+  const jumpPads: JumpPad[] = [
+    { pos: v3(-S + 6, 0, 0), radius: 1.8, power: 10 },
+    { pos: v3(S - 6, 0, 0), radius: 1.8, power: 10 },
+  ];
+
+  const spawns: SpawnPoint[] = [
+    spawn(-9, -S + 9, 0, "red"), spawn(-3, -S + 9, 0, "red"), spawn(3, -S + 9, 0, "red"), spawn(9, -S + 9, 0, "red"),
+    spawn(-9, S - 9, Math.PI, "blue"), spawn(-3, S - 9, Math.PI, "blue"), spawn(3, S - 9, Math.PI, "blue"), spawn(9, S - 9, Math.PI, "blue"),
+    spawn(-S + 6, 0, Math.PI / 2, "ffa"), spawn(S - 6, 0, -Math.PI / 2, "ffa"),
+  ];
+
+  const pickups: PickupSpawn[] = [
+    { id: "d_sniper", kind: "weapon", what: "sniper", pos: v3(0, 3.8, 0), respawnMs: 60000 },
+    { id: "d_rocket", kind: "weapon", what: "rocket", pos: v3(0, 1.8, -S + 5), respawnMs: 90000 },
+    { id: "d_sword", kind: "weapon", what: "sword", pos: v3(0, 1.8, S - 5), respawnMs: 75000 },
+    { id: "d_shotty_w", kind: "weapon", what: "shotgun", pos: v3(-S + 6, 0, 0), respawnMs: 45000 },
+    { id: "d_shotty_e", kind: "weapon", what: "shotgun", pos: v3(S - 6, 0, 0), respawnMs: 45000 },
+    { id: "d_over", kind: "powerup", what: "overshield", pos: v3(0, 3.8, 0), respawnMs: 120000 },
+  ];
+
+  return {
+    id: "dock",
+    name: "Loading Dock",
+    blurb: "Where returns go to die. Flank the trailer or rule its roof. Mind the dock edges.",
+    size: S,
+    ambient: 0x55504a,
+    fog: 0x312b24,
+    floorColor: 0x2a2620,
+    boxes,
+    ramps,
+    jumpPads,
+    spawns,
+    pickups,
+    hill: { pos: v3(0, 3.8, 0), radius: 4, moves: [v3(0, 3.8, 0), v3(-11, 0, 0), v3(11, 0, 0), v3(0, 1.2, -S + 5), v3(0, 1.2, S - 5)] },
+    oddballSpawn: v3(0, 3.9, 0),
+    skullSpawn: v3(0, 3.9, 0),
+  };
+}
+
 export const MAPS: Record<string, MapDef> = {
   gulch: bargainGulch(),
   warehouse: warehouse(),
   lattice: lattice(),
   aisle: aisleSeven(),
+  dock: loadingDock(),
 };
 
 export const MAP_LIST = Object.values(MAPS);

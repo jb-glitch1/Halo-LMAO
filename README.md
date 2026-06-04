@@ -4,7 +4,7 @@
 Next.js + React + Three.js + Socket.IO. Host a room, share a 4-letter code, and finish the
 fight.<sup>(knockoff)</sup>
 
-![modes](https://img.shields.io/badge/modes-4-orange) ![weapons](https://img.shields.io/badge/weapons-10-cyan) ![maps](https://img.shields.io/badge/maps-3-green)
+![modes](https://img.shields.io/badge/modes-7-orange) ![weapons](https://img.shields.io/badge/weapons-11-cyan) ![maps](https://img.shields.io/badge/maps-5%2B%E2%88%9E-green) ![tests](https://img.shields.io/badge/sim%20tests-passing-brightgreen)
 
 ---
 
@@ -21,6 +21,7 @@ Production:
 ```bash
 npm run build
 npm start          # honors $PORT (default 3000) and $HOST
+npm test           # headless unit tests for the framework-free game sim
 ```
 
 > The app runs on a **custom Node server** (`server.js`) that serves the Next.js site *and*
@@ -54,9 +55,16 @@ Precision weapons crush once a shield is popped (the blue flash) — go for the 
 
 ### Modes
 - **Slayer** (FFA) · **Team Slayer** (Red vs Blue) · **King of the Hill** · **Oddball**
+- **Black Friday** (Infection — melee horde vs survivors) · **Capture the Banner** (CTF) · **Clearance Ladder** (Gun Game)
 
 ### Maps
-- **Bargain Gulch** (Blood-Gulch-on-clearance) · **Clearance Warehouse** (CQB) · **Lattice of Disappointment** (vertical)
+- **Bargain Gulch** (Blood-Gulch-on-clearance) · **Clearance Warehouse** (CQB) · **Lattice of Disappointment** (vertical) · **Aisle Seven** (symmetric) · **Loading Dock**
+- ...plus an infinite **Bargain Bin Generator** for fresh random arenas (solo).
+
+### Toys
+- 🛒 **The Wartrolley** — a driveable shopping-cart 'hog with a cannon (and splatters). Press `E` near one.
+- 💣 **Trip mines** (cycle grenade with `X`), a scoped **DMR**, and hidden **Skulls** that toggle chaos modifiers.
+- Selectable announcers, a synthesized choir, positional audio, a directional damage indicator, and a Loyalty Program that tracks your lifetime stats. Plays on **desktop and touch/mobile**.
 
 ---
 

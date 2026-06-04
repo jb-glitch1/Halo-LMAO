@@ -9,6 +9,9 @@ const MODES = [
   { name: "Team Slayer", tag: "Red vs Blue", blurb: "The eternal struggle. Two colors. One slightly-cheaper canyon.", icon: "🚩" },
   { name: "King of the Hill", tag: "Zone control", blurb: "Stand in the glowing discount circle. It moves. Chase the savings.", icon: "👑" },
   { name: "Oddball", tag: "Hold the ball", blurb: "Carry the cursed skull. Everyone wants it. It is not worth it.", icon: "💀" },
+  { name: "Black Friday", tag: "Infection", blurb: "Melee doorbusters hunt armed shoppers. Get caught, join the horde.", icon: "🧟" },
+  { name: "Capture the Banner", tag: "CTF", blurb: "Steal their clearance banner, defend yours. Bring it home for the markdown.", icon: "🏴" },
+  { name: "Clearance Ladder", tag: "Gun Game", blurb: "Climb a ten-weapon rack with kills. Finish on the butterknife.", icon: "🔫" },
 ];
 
 const REVIEWS = [
@@ -79,9 +82,9 @@ export default function Home() {
 
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
             {[
-              ["10", "Knockoff weapons"],
-              ["4", "Off-brand arenas"],
-              ["5", "Game modes"],
+              ["11", "Knockoff weapons"],
+              ["5", "Off-brand arenas"],
+              ["7", "Game modes"],
               ["16", "Players / room"],
             ].map(([n, l]) => (
               <div key={l} className="panel py-4 px-3 bg-black/30">
@@ -116,7 +119,7 @@ export default function Home() {
       {/* MODES */}
       <section className="max-w-6xl mx-auto px-4 py-12">
         <h2 className="text-3xl font-extrabold mb-1 text-center">
-          Four <span className="text-temu-orange">Modes</span>, Zero Refunds
+          Seven <span className="text-temu-orange">Modes</span>, Zero Refunds
         </h2>
         <p className="text-center text-hud-amber/50 mb-8 font-mono text-sm">pick your flavor of mayhem</p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -163,7 +166,7 @@ export default function Home() {
 
       {/* MAPS */}
       <section className="max-w-6xl mx-auto px-4 py-12">
-        <h2 className="text-3xl font-extrabold mb-6 text-center">Four <span className="text-temu-orange">Arenas</span></h2>
+        <h2 className="text-3xl font-extrabold mb-6 text-center">Five <span className="text-temu-orange">Arenas</span> <span className="text-hud-amber/50 text-base font-normal">+ infinite random ones</span></h2>
         <div className="grid sm:grid-cols-3 gap-4">
           {MAP_LIST.map((m, i) => (
             <div key={m.id} className="panel overflow-hidden group">
