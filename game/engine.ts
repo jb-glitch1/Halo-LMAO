@@ -44,6 +44,13 @@ export interface AddPlayerOpts {
   color?: number;
 }
 
+interface FlagRuntime {
+  pos: Vec3;
+  home: Vec3;
+  carrier: string | null;
+  droppedAt: number;
+}
+
 const emptyInput = (): PlayerInput => ({
   moveX: 0,
   moveZ: 0,
@@ -94,6 +101,8 @@ export class Engine {
   hillProgress = 0;
   oddballPos: Vec3 = v3();
   oddballCarrier: string | null = null;
+  // CTF banners
+  flags: { red: FlagRuntime; blue: FlagRuntime } | null = null;
 
   // infection (Black Friday)
   private _announcedLast = false;
@@ -200,6 +209,24 @@ export class Engine {
       this.oddballPos = { ...this.map.oddballSpawn };
       this.oddballCarrier = null;
     }
+    if (this.config.mode === "ctf") {
+      const r = this.teamHome("red");
+      const b = this.teamHome("blue");
+      this.flags = {
+        red: { pos: { ...r }, home: { ...r }, carrier: null, droppedAt: 0 },
+        blue: { pos: { ...b }, home: { ...b }, carrier: null, droppedAt: 0 },
+      };
+    } else {
+      this.flags = null;
+    }
+  }
+
+  teamHome(team: Team): Vec3 {
+    const pts = this.map.spawns.filter((s) => s.team === team);
+    if (!pts.length) return v3(0, 0, team === "red" ? -this.map.size * 0.7 : this.map.size * 0.7);
+    let x = 0, y = 0, z = 0;
+    for (const s of pts) { x += s.pos.x; y += s.pos.y; z += s.pos.z; }
+    return v3(x / pts.length, y / pts.length, z / pts.length);
   }
 
   addPlayer(id: string, opts: AddPlayerOpts) {
@@ -306,6 +333,7 @@ export class Engine {
     p.recentDamagers = {};
     p.vehicleId = null;
     p.vehicleSeat = undefined;
+    p.carryingFlag = null;
     // loadout — infected get the energy butterknife; survivors their loadout
     if (this.config.mode === "infection" && p.infected) {
       p.weapons = ["sword"];
@@ -984,6 +1012,7 @@ export class Engine {
       victim.vehicleId = null;
       victim.vehicleSeat = undefined;
     }
+    if (this.flags && victim.carryingFlag) this.dropFlag(victim.carryingFlag, victim.pos, now);
     this.pushFx("death", vadd(victim.pos, v3(0, 0.8, 0)), victim.team);
 
     const betrayal =
@@ -1456,7 +1485,73 @@ export class Engine {
       if (survivors === 0) this.endMatch("score");
     }
 
+    if (this.config.mode === "ctf") this.stepCtf(dt, now);
+
     // slayer/team win by kills handled in killPlayer via checkWin
+  }
+
+  // ---------------- CTF ----------------
+  stepCtf(dt: number, now: number) {
+    if (!this.flags) return;
+    (["red", "blue"] as const).forEach((team) => {
+      const flag = this.flags![team];
+      const enemy: Team = team === "red" ? "blue" : "red";
+      if (flag.carrier) {
+        const c = this.players.get(flag.carrier);
+        if (!c || !c.alive || c.team !== enemy) {
+          this.dropFlag(team, c ? c.pos : flag.home, now);
+          return;
+        }
+        flag.pos = { x: c.pos.x, y: c.pos.y + 1.4, z: c.pos.z };
+        const ownFlag = this.flags![enemy]; // the carrier's own banner
+        if (vdist(c.pos, ownFlag.home) < 3 && !ownFlag.carrier && this.flagHome(ownFlag)) {
+          this.teamScore[enemy]++;
+          c.score += 5;
+          this.announce("BANNER CAPTURED", `${enemy.toUpperCase()} cashes in`, true);
+          this.returnFlag(team);
+          if (this.teamScore[enemy] >= this.config.scoreLimit) this.endMatch("score");
+        }
+      } else {
+        const home = this.flagHome(flag);
+        for (const p of this.players.values()) {
+          if (!p.alive || vdist(p.pos, flag.pos) > 2) continue;
+          if (p.team === enemy) {
+            flag.carrier = p.id;
+            flag.droppedAt = 0;
+            p.carryingFlag = team;
+            this.announce("BANNER GRABBED", `${team.toUpperCase()} banner taken`, false);
+            break;
+          } else if (p.team === team && !home) {
+            this.returnFlag(team);
+            this.announce("BANNER RETURNED", `${team.toUpperCase()} banner is home`, false);
+            break;
+          }
+        }
+        if (!home && flag.droppedAt && now - flag.droppedAt > 12000) this.returnFlag(team);
+      }
+    });
+  }
+
+  flagHome(f: FlagRuntime): boolean {
+    return vdist(f.pos, f.home) < 0.6;
+  }
+  dropFlag(team: Team, pos: Vec3, now: number) {
+    if (!this.flags) return;
+    const f = this.flags[team as "red" | "blue"];
+    const c = f.carrier ? this.players.get(f.carrier) : null;
+    if (c) c.carryingFlag = null;
+    f.carrier = null;
+    f.pos = { x: pos.x, y: pos.y, z: pos.z };
+    f.droppedAt = now;
+  }
+  returnFlag(team: Team) {
+    if (!this.flags) return;
+    const f = this.flags[team as "red" | "blue"];
+    const c = f.carrier ? this.players.get(f.carrier) : null;
+    if (c) c.carryingFlag = null;
+    f.carrier = null;
+    f.pos = { ...f.home };
+    f.droppedAt = 0;
   }
 
   checkWin(now: number) {
@@ -1490,7 +1585,7 @@ export class Engine {
   }
 
   usesTeams() {
-    return this.config.mode === "team" || this.config.mode === "infection";
+    return this.config.mode === "team" || this.config.mode === "infection" || this.config.mode === "ctf";
   }
 
   computeWinner(): Team | string | null {
@@ -1523,6 +1618,7 @@ export class Engine {
         koth: "KING OF THE HILL — hold the discount zone",
         oddball: "ODDBALL — hold the cursed ball",
         infection: "BLACK FRIDAY — survive the doorbuster horde",
+        ctf: "CAPTURE THE BANNER — steal theirs, defend yours",
       } as Record<string, string>
     )[this.config.mode];
   }
@@ -1584,6 +1680,12 @@ export class Engine {
     }
     if (this.map.oddballSpawn) {
       snap.oddball = { pos: { ...this.oddballPos }, carrier: this.oddballCarrier };
+    }
+    if (this.flags) {
+      snap.flags = {
+        red: { pos: { ...this.flags.red.pos }, carrier: this.flags.red.carrier, home: this.flagHome(this.flags.red) },
+        blue: { pos: { ...this.flags.blue.pos }, carrier: this.flags.blue.carrier, home: this.flagHome(this.flags.blue) },
+      };
     }
     return snap;
   }

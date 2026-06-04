@@ -1,7 +1,7 @@
 import type { Vec3 } from "./vec";
 
 export type Team = "red" | "blue" | "ffa";
-export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection";
+export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection" | "ctf";
 export type SkullId = "thrifty" | "boom" | "birthday" | "famine" | "sugar";
 
 export interface Box {
@@ -66,6 +66,12 @@ export interface MapDef {
   oddballSpawn?: Vec3;
   vehicleSpawns?: { pos: Vec3; yaw: number }[]; // Wartrolley spawns
   skullSpawn?: Vec3; // hidden chaos-skull easter egg
+}
+
+export interface FlagInfo {
+  pos: Vec3;
+  carrier: string | null;
+  home: boolean;
 }
 
 export interface VehicleState {
@@ -206,6 +212,8 @@ export interface PlayerState {
   ping?: number;
   // infection (Black Friday): role flag, true once "value-acquired"
   infected?: boolean;
+  // CTF: which team's banner this player is carrying (null = none)
+  carryingFlag?: Team | null;
   // vehicle occupancy
   vehicleId?: string | null;
   vehicleSeat?: "driver" | "gunner";
@@ -297,6 +305,7 @@ export interface Snapshot {
   teamScore: { red: number; blue: number };
   hill?: { pos: Vec3; radius: number; controller: Team | null; progress: number };
   oddball?: { pos: Vec3; carrier: string | null };
+  flags?: { red: FlagInfo; blue: FlagInfo };
   players: PlayerState[];
   projectiles: ProjectileState[];
   vehicles?: VehicleState[];

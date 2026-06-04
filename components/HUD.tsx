@@ -50,6 +50,7 @@ export interface HudModel {
   connecting?: boolean;
   driving?: { seat: "driver" | "gunner" };
   infection?: { role: "survivor" | "infected"; survivorsLeft: number };
+  ctf?: { yourHome: boolean; enemyHome: boolean; youCarry: boolean };
   damageDir?: number | null; // bearing to last attacker (rad, 0 = ahead), null = hide
   colorblind?: boolean; // shape-code radar blips instead of relying on color
 }
@@ -122,6 +123,12 @@ export default function HUD({ m }: { m: HudModel }) {
             ) : (
               <span className="text-hud-cyan">🛡️ SURVIVOR — {m.infection.survivorsLeft} left · don&apos;t get caught</span>
             )}
+          </div>
+        )}
+        {m.ctf && (
+          <div className="panel2 px-3 py-0.5 text-xs flex gap-3">
+            <span className={m.ctf.yourHome ? "text-hud-cyan" : "text-temu-red animate-pulse"}>🏴 yours: {m.ctf.yourHome ? "home" : "STOLEN"}</span>
+            <span className={m.ctf.youCarry ? "text-hud-green" : "text-hud-amber/70"}>🚩 theirs: {m.ctf.youCarry ? "you have it!" : m.ctf.enemyHome ? "home" : "loose"}</span>
           </div>
         )}
       </div>

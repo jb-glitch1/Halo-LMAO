@@ -324,6 +324,12 @@ export function botThink(e: Engine, bot: PlayerState, now: number) {
 }
 
 function pickWaypoint(e: Engine, bot: PlayerState): Vec3 {
+  // CTF: go grab the enemy banner, or run a carried banner home
+  if (e.config.mode === "ctf" && e.flags && (bot.team === "red" || bot.team === "blue")) {
+    const own = bot.team as "red" | "blue";
+    const enemy = own === "red" ? "blue" : "red";
+    return bot.carryingFlag ? { ...e.flags[own].home } : { ...e.flags[enemy].pos };
+  }
   const roll = Math.random();
   // head toward the action: a living enemy
   if (roll < 0.45) {

@@ -368,6 +368,13 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       infection: snap.mode === "infection"
         ? { role: self?.infected ? "infected" : "survivor", survivorsLeft: snap.players.filter((p) => !p.infected).length }
         : undefined,
+      ctf: snap.mode === "ctf" && snap.flags
+        ? {
+            yourHome: (session.localTeam === "red" ? snap.flags.red : snap.flags.blue).home,
+            enemyHome: (session.localTeam === "red" ? snap.flags.blue : snap.flags.red).home,
+            youCarry: (session.localTeam === "red" ? snap.flags.blue : snap.flags.red).carrier === localId,
+          }
+        : undefined,
       damageDir: dmgDir.current && now - dmgDir.current.ts < 1100 ? dmgDir.current.ang : null,
       colorblind: colorblindRef.current,
     };

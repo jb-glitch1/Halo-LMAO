@@ -119,6 +119,7 @@ export class Renderer {
 
   players = new Map<string, PlayerVisual>();
   vehicles = new Map<string, THREE.Group>();
+  flagVisuals = new Map<string, THREE.Group>();
   projectiles = new Map<number, THREE.Object3D>();
   pickups = new Map<string, { mesh: THREE.Object3D; baseY: number }>();
   fx: Fx[] = [];
@@ -702,6 +703,20 @@ export class Renderer {
       }
     }
 
+    // CTF banners
+    if (snap.flags) {
+      for (const team of ["red", "blue"] as const) {
+        const fi = snap.flags[team];
+        let g = this.flagVisuals.get(team);
+        if (!g) {
+          g = this.makeFlag(team === "red" ? 0xff4d5e : 0x3aa0ff);
+          this.scene.add(g);
+          this.flagVisuals.set(team, g);
+        }
+        g.position.set(fi.pos.x, fi.pos.y, fi.pos.z);
+      }
+    }
+
     // pickups
     for (const pk of snap.pickups) {
       let entry = this.pickups.get(pk.id);
@@ -820,6 +835,23 @@ export class Renderer {
       wheels.push(w);
     }
     g.userData.wheels = wheels;
+    return g;
+  }
+
+  // ---------- CTF banner ----------
+  makeFlag(color: number): THREE.Group {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x9aa6b2, metalness: 0.6, roughness: 0.4 }),
+    );
+    pole.position.y = 1;
+    const banner = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.9, 0.6),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, side: THREE.DoubleSide, metalness: 0.1, roughness: 0.6 }),
+    );
+    banner.position.set(0.5, 1.7, 0);
+    g.add(pole, banner);
     return g;
   }
 

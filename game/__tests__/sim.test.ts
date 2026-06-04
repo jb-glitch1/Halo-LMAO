@@ -178,6 +178,28 @@ test("bots board and drive an idle Wartrolley", () => {
   assert.ok(Math.hypot(cart.pos.x - sx, cart.pos.z - sz) > 1, "bot should drive it somewhere");
 });
 
+test("ctf: grabbing the enemy banner and carrying it home scores a capture", () => {
+  const e = new Engine(cfg({ mode: "ctf", scoreLimit: 3 }));
+  e.addPlayer("r", { name: "r", team: "red", isBot: false });
+  e.addPlayer("b", { name: "b", team: "blue", isBot: false });
+  e.start(0);
+  e.step(1 / 60, 4000); // live
+  const flags = e.flags!;
+  assert.ok(flags, "ctf initialises banners");
+  const r = e.players.get("r")!;
+
+  r.pos = { ...flags.blue.home }; // red player stands on the blue banner
+  e.stepCtf(1 / 60, 4000);
+  assert.equal(flags.blue.carrier, "r", "red grabs the blue banner");
+  assert.equal(r.carryingFlag, "blue");
+
+  r.pos = { ...flags.red.home }; // carry it back to red's base (red banner is home)
+  const before = e.teamScore.red;
+  e.stepCtf(1 / 60, 4001);
+  assert.equal(e.teamScore.red, before + 1, "red scores a capture");
+  assert.equal(flags.blue.carrier, null, "blue banner returns after the capture");
+});
+
 test("every map boots players onto solid ground, in bounds, alive", () => {
   assert.ok(MAP_LIST.length >= 4, "at least four arenas");
   for (const m of MAP_LIST) {
