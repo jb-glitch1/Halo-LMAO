@@ -93,7 +93,7 @@ export default function HUD({ m }: { m: HudModel }) {
       )}
 
       {/* ---- top center: score / timer ---- */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 hud-cluster">
         <div className="panel2 px-4 py-1.5 flex items-center gap-4 text-sm">
           {m.useTeams ? (
             <>
@@ -140,7 +140,7 @@ export default function HUD({ m }: { m: HudModel }) {
       </div>
 
       {/* ---- killfeed top right ---- */}
-      <div className="absolute top-14 right-3 flex flex-col items-end gap-1 text-xs max-w-xs">
+      <div className="absolute top-14 right-3 flex flex-col items-end gap-1 text-xs max-w-xs hud-cluster">
         {m.killfeed.map((k) => (
           <div key={k.id} className={`panel2 px-2 py-1 flex items-center gap-1.5 ${k.mine ? "border-temu-orange/60" : ""} pop`}>
             {k.medal && <span className="text-temu-gold mr-1">🏅</span>}
@@ -178,16 +178,16 @@ export default function HUD({ m }: { m: HudModel }) {
       )}
 
       {/* ---- bottom-left: radar + shield/health ---- */}
-      <div className="absolute bottom-3 left-3 flex flex-col gap-2">
+      <div className="absolute bottom-3 left-3 flex flex-col gap-2 hud-cluster">
         <Radar radar={m.radar} alive={m.alive} colorblind={m.colorblind} />
         <div className="w-56">
           {/* shield */}
-          <div className="h-2.5 bg-black/50 rounded-sm overflow-hidden border border-hud-line mb-1 relative">
-            <div className="h-full transition-all duration-150" style={{ width: `${Math.min(100, (m.shield / 100) * 100)}%`, background: m.overshield ? "linear-gradient(90deg,#36e7ff,#b06bff)" : "linear-gradient(90deg,#36e7ff,#3aa0ff)" }} />
-            {m.overshield && <div className="absolute inset-0 animate-pulse" style={{ boxShadow: "inset 0 0 8px #36e7ff" }} />}
+          <div className="h-3 bg-black/50 rounded-sm overflow-hidden border border-hud-line mb-1 relative">
+            <div className="h-full" style={{ transition: "width var(--dur-1) var(--ease-out)", width: `${Math.min(100, (m.shield / 100) * 100)}%`, background: m.overshield ? "linear-gradient(90deg,#36e7ff,#b06bff)" : "linear-gradient(90deg,#36e7ff,#3aa0ff)" }} />
+            {m.overshield && <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 8px #36e7ff" }} />}
           </div>
           {/* health segmented */}
-          <div className="h-2 bg-black/50 rounded-sm overflow-hidden border border-hud-line flex">
+          <div className="h-2.5 bg-black/50 rounded-sm overflow-hidden border border-hud-line flex">
             {Array.from({ length: 10 }).map((_, i) => {
               const seg = (m.health - i * 10) / 10;
               return <div key={i} className="flex-1 border-r border-black/40" style={{ background: seg > 0 ? `rgba(93,255,155,${0.35 + seg * 0.65})` : "transparent" }} />;
@@ -197,7 +197,7 @@ export default function HUD({ m }: { m: HudModel }) {
       </div>
 
       {/* ---- bottom-right: ammo + grenades ---- */}
-      <div className="absolute bottom-3 right-3 text-right">
+      <div className="absolute bottom-3 right-3 text-right hud-cluster">
         {m.driving ? (
           <div className="panel2 px-3 py-2 inline-block text-left">
             <div className="text-[10px] uppercase tracking-widest text-temu-orange">🛒 Wartrolley</div>
@@ -338,7 +338,7 @@ function Scoreboard({ m }: { m: HudModel }) {
           <h2 className="text-xl font-bold text-hud-amber">{m.modeLabel}</h2>
           {m.useTeams ? (
             <div className="flex gap-4 text-lg font-bold">
-              <span className="text-temu-red">RED {m.teamScore.red}</span>
+              <span className="text-hud-red">RED {m.teamScore.red}</span>
               <span className="text-hud-blue">BLUE {m.teamScore.blue}</span>
             </div>
           ) : (

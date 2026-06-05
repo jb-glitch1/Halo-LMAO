@@ -5,6 +5,12 @@
 :root {
   --font-display: "Oswald", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* motion tokens */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.2, 1.4, 0.5, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 400ms;
 }
 
 * {
@@ -21,6 +27,13 @@ body {
   overscroll-behavior: none;
 }
 
+/* keyboard focus ring — cyan = interactive (color doctrine) */
+:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid #36e7ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 @layer components {
   .panel {
     @apply bg-hud-panel/90 border border-hud-line rounded-xl backdrop-blur-sm;
@@ -28,8 +41,37 @@ body {
   .panel2 {
     @apply bg-hud-panel2/90 border border-hud-line rounded-lg;
   }
+  /* ---- type scale (Oswald display / JetBrains Mono data) ---- */
+  .t-h1 {
+    @apply text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight;
+  }
+  .t-h2 {
+    @apply text-2xl font-bold leading-tight;
+  }
+  .t-h3 {
+    @apply text-lg font-bold;
+  }
+  .t-body {
+    @apply text-sm leading-relaxed text-hud-amber/65;
+  }
+  .t-data {
+    @apply font-mono tabular-nums;
+  }
+  /* ---- diegetic HUD surfaces ---- */
+  /* soft dark backing so HUD clusters stay legible over bright maps */
+  .hud-cluster {
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: radial-gradient(120% 100% at 50% 50%, rgba(3, 6, 9, 0.42), transparent 78%);
+  }
+  .clip-notch {
+    clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-semibold tracking-wide uppercase text-sm transition-all duration-150 select-none cursor-pointer;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-semibold tracking-wide uppercase text-sm select-none cursor-pointer;
+    transition: transform var(--dur-1) var(--ease-out), filter var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out),
+      box-shadow var(--dur-1) var(--ease-out);
   }
   .btn-primary {
     @apply btn bg-gradient-to-b from-temu-orange to-temu-red text-black shadow-glow hover:brightness-110 active:scale-95;
@@ -127,7 +169,7 @@ canvas {
 }
 
 .fade-in {
-  animation: fadein 0.4s ease both;
+  animation: fadein var(--dur-3) var(--ease-out) both;
 }
 @keyframes fadein {
   from {
@@ -140,7 +182,7 @@ canvas {
   }
 }
 .pop {
-  animation: pop 0.25s cubic-bezier(0.2, 1.4, 0.5, 1) both;
+  animation: pop var(--dur-2) var(--ease-spring) both;
 }
 @keyframes pop {
   from {
@@ -226,7 +268,12 @@ canvas {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-twinkle,
-  .hero-title-flicker {
+  .hero-title-flicker,
+  .title-shimmer,
+  .animate-spin,
+  .animate-pulse,
+  .pop,
+  .fade-in {
     animation: none !important;
   }
   .btn-holo::after {
