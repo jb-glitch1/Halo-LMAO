@@ -8,7 +8,7 @@ export default function About() {
     <main className="min-h-screen grid-bg">
       <Nav />
       <div className="max-w-3xl mx-auto px-4 py-10">
-        <h1 className="text-4xl font-extrabold mb-1">About <span className="text-temu-orange">LMAO</span></h1>
+        <h1 className="t-h1 mb-1">About <span className="text-temu-orange">LMAO</span></h1>
         <p className="text-hud-amber/50 font-mono text-sm mb-8">Lethal Mayhem: Arena Online · est. whenever this finished building</p>
 
         <div className="panel p-6 mb-6">
@@ -16,7 +16,8 @@ export default function About() {
           <p className="text-hud-amber/70 leading-relaxed">
             LMAO is a love letter to arena shooters — written on the back of a clearance receipt. It’s a fully
             in-browser, first-person multiplayer FPS with regenerating shields, a sandbox of suspiciously-familiar
-            weapons, four game modes, three arenas, bots, medals, and a robotic announcer who clearly has notes.
+            weapons, a drivable shopping cart, seven game modes, five arenas (plus a random-arena generator), bots,
+            medals, and a robotic announcer who clearly has notes.
             Think “the big green-armored space-ranger game,” but value-engineered, legally distinct, and free.
           </p>
         </div>
@@ -36,7 +37,7 @@ export default function About() {
           <ul className="text-hud-amber/70 space-y-1.5 text-sm">
             <li>▹ <span className="text-hud-cyan font-mono">Next.js + React</span> — site, portal &amp; deployment shell</li>
             <li>▹ <span className="text-hud-cyan font-mono">Three.js / WebGL</span> — the 3D renderer &amp; viewmodels</li>
-            <li>▹ <span className="text-hud-cyan font-mono">Custom TS engine</span> — physics, weapons, AI, and four modes, all framework-free</li>
+            <li>▹ <span className="text-hud-cyan font-mono">Custom TS engine</span> — physics, weapons, AI, vehicles, and seven modes, all framework-free (and unit-tested)</li>
             <li>▹ <span className="text-hud-cyan font-mono">Socket.IO</span> — rooms, lobby, host↔client relay</li>
             <li>▹ <span className="text-hud-cyan font-mono">Web Audio API</span> — every sound is synthesized live (no audio files)</li>
           </ul>

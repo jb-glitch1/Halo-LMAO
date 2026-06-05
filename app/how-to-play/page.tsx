@@ -39,7 +39,7 @@ export default function HowToPlay() {
     <main className="min-h-screen grid-bg">
       <Nav />
       <div className="max-w-5xl mx-auto px-4 py-10">
-        <h1 className="text-4xl font-extrabold mb-1">How to <span className="text-temu-orange">Play</span></h1>
+        <h1 className="t-h1 mb-1">How to <span className="text-temu-orange">Play</span></h1>
         <p className="text-hud-amber/50 font-mono text-sm mb-8">
           Click the arena to lock your mouse. Press Esc to escape (your mouse, not the regret).
         </p>

@@ -294,7 +294,7 @@ function SoloSetup({ onStart, onBack, initial }: { onStart: (c: MatchConfig) => 
           <Logo />
           <button onClick={onBack} className="btn-ghost !py-2 !px-4">← Back</button>
         </div>
-        <h1 className="text-3xl font-extrabold mb-6">Custom <span className="text-temu-orange">Bot Match</span></h1>
+        <h1 className="t-h1 mb-6">Custom <span className="text-temu-orange">Bot Match</span></h1>
         <div className="panel p-5 space-y-5">
           <div>
             <div className="label mb-2">Mode</div>
