@@ -107,6 +107,9 @@ interface Fx {
 }
 
 const TEAM_HEX = { red: 0xff4d5e, blue: 0x3aa0ff, ffa: 0xffcf4d };
+// In-world holographic marker palette — mirrors the 2D HUD color doctrine
+// (cyan = system/tech, amber = neutral objective, purple = relic).
+const MARKER = { lift: 0x36e7ff, hill: 0xffcf4d, oddball: 0xb06bff };
 const VM_BASE = { x: 0.32, y: -0.4, z: -0.58 };
 
 export class Renderer {
@@ -447,13 +450,13 @@ export class Renderer {
     // jump pads
     for (const pad of map.jumpPads) {
       const geo = new THREE.CylinderGeometry(pad.radius, pad.radius * 1.1, 0.25, 20);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x36e7ff, transparent: true, opacity: 0.55 });
+      const mat = new THREE.MeshBasicMaterial({ color: MARKER.lift, transparent: true, opacity: 0.55 });
       const m = new THREE.Mesh(geo, mat);
       m.position.set(pad.pos.x, pad.pos.y + 0.13, pad.pos.z);
       this.worldGroup.add(m);
       const beam = new THREE.Mesh(
         new THREE.CylinderGeometry(pad.radius * 0.6, pad.radius * 0.6, 6, 16, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0x36e7ff, transparent: true, opacity: 0.12, side: THREE.DoubleSide }),
+        new THREE.MeshBasicMaterial({ color: MARKER.lift, transparent: true, opacity: 0.12, side: THREE.DoubleSide }),
       );
       beam.position.set(pad.pos.x, pad.pos.y + 3, pad.pos.z);
       this.worldGroup.add(beam);
@@ -463,12 +466,12 @@ export class Renderer {
     if (map.hill) {
       this.hillMesh = new THREE.Mesh(
         new THREE.CylinderGeometry(map.hill.radius, map.hill.radius, 0.1, 32, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0xffcf4d, transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
+        new THREE.MeshBasicMaterial({ color: MARKER.hill, transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
       );
       this.worldGroup.add(this.hillMesh);
       const wall = new THREE.Mesh(
         new THREE.CylinderGeometry(map.hill.radius, map.hill.radius, 3, 32, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0xffcf4d, transparent: true, opacity: 0.08, side: THREE.DoubleSide }),
+        new THREE.MeshBasicMaterial({ color: MARKER.hill, transparent: true, opacity: 0.08, side: THREE.DoubleSide }),
       );
       wall.position.y = 1.5;
       this.hillMesh.add(wall);
@@ -476,7 +479,7 @@ export class Renderer {
     if (map.oddballSpawn) {
       this.oddballMesh = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.45, 0),
-        new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x6b2bff, emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.4 }),
+        new THREE.MeshStandardMaterial({ color: 0x222222, emissive: MARKER.oddball, emissiveIntensity: 0.7, metalness: 0.4, roughness: 0.4 }),
       );
       this.worldGroup.add(this.oddballMesh);
     }
@@ -559,11 +562,15 @@ export class Renderer {
     const teamHex = p.infected ? 0x67e36a : TEAM_HEX[p.team] ?? 0xcccccc;
     const armorMat = new THREE.MeshStandardMaterial({ color: teamHex, metalness: 0.5, roughness: 0.42 });
     const darkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(teamHex).multiplyScalar(0.45), metalness: 0.55, roughness: 0.4 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: teamHex, emissive: teamHex, emissiveIntensity: 0.5, metalness: 0.3, roughness: 0.4 });
     // torso + chest plate
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.33, 0.8, 4, 10), armorMat);
     body.position.y = 0.95;
     const chest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.44, 0.36), darkMat);
     chest.position.set(0, 1.16, 0.02);
+    // glowing team trim across the chest — at-a-glance team read + silhouette accent
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.07, 0.02), trimMat);
+    trim.position.set(0, 1.22, -0.17);
     // pauldrons
     const pauldron = new THREE.BoxGeometry(0.24, 0.22, 0.34);
     const lPaul = new THREE.Mesh(pauldron, armorMat);
@@ -597,7 +604,7 @@ export class Renderer {
     ring.position.y = 0.03;
     const tag = this.makeTag(p.name, teamHex);
     tag.position.y = 2.3;
-    group.add(body, chest, lPaul, rPaul, head, brow, visor, weapon, ring, tag);
+    group.add(body, chest, trim, lPaul, rPaul, head, brow, visor, weapon, ring, tag);
     if (QUALITY[this.quality].shadows) {
       const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), this.blobMaterial());
       blob.rotation.x = -Math.PI / 2;
@@ -709,7 +716,7 @@ export class Renderer {
         const fi = snap.flags[team];
         let g = this.flagVisuals.get(team);
         if (!g) {
-          g = this.makeFlag(team === "red" ? 0xff4d5e : 0x3aa0ff);
+          g = this.makeFlag(team === "red" ? TEAM_HEX.red : TEAM_HEX.blue);
           this.scene.add(g);
           this.flagVisuals.set(team, g);
         }
@@ -734,7 +741,7 @@ export class Renderer {
     if (snap.hill && this.hillMesh) {
       this.hillMesh.position.set(snap.hill.pos.x, snap.hill.pos.y + 0.06, snap.hill.pos.z);
       const c = snap.hill.controller;
-      const col = c ? TEAM_COLOR[c] : 0xffcf4d;
+      const col = c ? TEAM_COLOR[c] : MARKER.hill;
       ((this.hillMesh.material as THREE.MeshBasicMaterial).color as THREE.Color).setHex(col);
     }
     if (snap.oddball && this.oddballMesh) {
