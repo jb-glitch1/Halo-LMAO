@@ -39,24 +39,34 @@ function makeCode() {
   return code;
 }
 
-function sanitizeName(n) {
-  return String(n || "Spartan").slice(0, 16).replace(/[^\w \-]/g, "") || "Spartan";
-}
-
+const { sanitizeName, defaultConfig } = REG;
 const isFfaMode = (m) => REG.FFA_MODES.includes(m);
 
-function defaultConfig(c = {}) {
-  return {
-    mode: REG.MODE_IDS.includes(c.mode) ? c.mode : "team",
-    mapId: REG.MAP_IDS.includes(c.mapId) ? c.mapId : "gulch",
-    scoreLimit: Math.max(3, Math.min(500, parseInt(c.scoreLimit) || 25)),
-    timeLimitSec: Math.max(60, Math.min(1800, parseInt(c.timeLimitSec) || 420)),
-    botCount: Math.max(0, Math.min(REG.MAX_BOTS, parseInt(c.botCount ?? 6))),
-    botSkill: Math.max(0, Math.min(1, typeof c.botSkill === "number" ? c.botSkill : 0.6)),
-    friendlyFire: !!c.friendlyFire,
-    startingLoadout: typeof c.startingLoadout === "string" ? c.startingLoadout : "recruit",
-    skulls: Array.isArray(c.skulls) ? c.skulls.filter((s) => REG.SKULL_IDS.includes(s)).slice(0, REG.SKULL_IDS.length) : undefined,
-  };
+// Per-socket token buckets: [burst capacity, refill per second]. Generous for
+// legit traffic (inputs stream at 33Hz, snapshots at 20Hz), tight enough that
+// a hostile client can't flood the relay or the host's browser.
+const RATE = {
+  createRoom: [3, 0.2],
+  joinRoom: [5, 0.5],
+  updateSelf: [10, 4],
+  updateConfig: [10, 4],
+  startMatch: [4, 0.5],
+  returnLobby: [4, 0.5],
+  input: [90, 45],
+  snapshot: [45, 25],
+  chat: [6, 1.5],
+  leaveRoom: [6, 1],
+};
+function allow(socket, ev) {
+  const buckets = (socket.data.buckets ||= {});
+  const [cap, rate] = RATE[ev];
+  const now = Date.now();
+  const b = (buckets[ev] ||= { tokens: cap, at: now });
+  b.tokens = Math.min(cap, b.tokens + ((now - b.at) / 1000) * rate);
+  b.at = now;
+  if (b.tokens < 1) return false;
+  b.tokens -= 1;
+  return true;
 }
 
 function roomInfo(room) {
@@ -94,6 +104,7 @@ app.prepare().then(() => {
     socket.data.code = null;
 
     socket.on("createRoom", ({ profile, config }, cb) => {
+      if (!allow(socket, "createRoom")) return;
       if (socket.data.code) leaveRoom(socket, socket.data.code); // one room per socket
       if (rooms.size >= MAX_ROOMS) {
         return typeof cb === "function" && cb({ error: "Server is at room capacity. Try again soon." });
@@ -124,6 +135,7 @@ app.prepare().then(() => {
     });
 
     socket.on("joinRoom", ({ code, profile }, cb) => {
+      if (!allow(socket, "joinRoom")) return;
       const room = rooms.get(String(code || "").toUpperCase());
       if (!room) return cb && cb({ error: "Room not found. Check the code." });
       if (room.state !== "lobby") return cb && cb({ error: "That match already started." });
@@ -153,6 +165,7 @@ app.prepare().then(() => {
     });
 
     socket.on("updateSelf", ({ code, patch }) => {
+      if (!allow(socket, "updateSelf")) return;
       const room = rooms.get(code);
       if (!room) return;
       const p = room.players.get(socket.id);
@@ -165,6 +178,7 @@ app.prepare().then(() => {
     });
 
     socket.on("updateConfig", ({ code, patch }) => {
+      if (!allow(socket, "updateConfig")) return;
       const room = rooms.get(code);
       if (!room || room.hostId !== socket.id) return;
       room.config = defaultConfig({ ...room.config, ...patch });
@@ -185,6 +199,7 @@ app.prepare().then(() => {
     });
 
     socket.on("startMatch", ({ code }) => {
+      if (!allow(socket, "startMatch")) return;
       const room = rooms.get(code);
       if (!room || room.hostId !== socket.id) return;
       room.state = "in-game";
@@ -197,6 +212,7 @@ app.prepare().then(() => {
     });
 
     socket.on("returnLobby", ({ code }) => {
+      if (!allow(socket, "returnLobby")) return;
       const room = rooms.get(code);
       if (!room || room.hostId !== socket.id) return;
       room.state = "lobby";
@@ -207,18 +223,21 @@ app.prepare().then(() => {
 
     // ---- in-match relay (members only) ----
     socket.on("input", ({ code, input }) => {
+      if (!allow(socket, "input")) return;
       const room = rooms.get(code);
       if (!room || !room.players.has(socket.id)) return;
       io.to(room.hostId).emit("clientInput", { id: socket.id, input });
     });
 
     socket.on("snapshot", ({ code, snap }) => {
+      if (!allow(socket, "snapshot")) return;
       const room = rooms.get(code);
       if (!room || room.hostId !== socket.id) return;
       socket.to(room.code).emit("snapshot", { snap });
     });
 
     socket.on("chat", ({ code, text }) => {
+      if (!allow(socket, "chat")) return;
       const room = rooms.get(code);
       if (!room) return;
       const p = room.players.get(socket.id);

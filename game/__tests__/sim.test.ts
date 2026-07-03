@@ -62,6 +62,19 @@ test("shared registry stays in sync with the engine and map registry", () => {
   assert.deepEqual([...REG.MAP_IDS].sort(), handBuilt, "server map whitelist matches game/maps.ts");
 });
 
+test("shared defaultConfig accepts every mode/map, clamps junk, filters skulls", () => {
+  for (const mode of REG.MODE_IDS) assert.equal(REG.defaultConfig({ mode }).mode, mode);
+  for (const mapId of REG.MAP_IDS) assert.equal(REG.defaultConfig({ mapId }).mapId, mapId);
+  const junk = REG.defaultConfig({ mode: "hacked", mapId: "nope", scoreLimit: 99999, botCount: 999, skulls: ["boom", "fake"] });
+  assert.equal(junk.mode, "team");
+  assert.equal(junk.mapId, "gulch");
+  assert.ok(junk.scoreLimit <= 500);
+  assert.ok(junk.botCount <= REG.MAX_BOTS);
+  assert.deepEqual(junk.skulls, ["boom"]);
+  assert.equal(REG.sanitizeName("<script>alert(1)</script>"), "scriptalert1");
+  assert.equal(REG.sanitizeName(""), "Spartan");
+});
+
 test("engine ignores inputs for unknown player ids", () => {
   const e = liveEngine();
   e.setInput("total-stranger", input({ fire: true }));
