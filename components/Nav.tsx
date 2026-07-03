@@ -18,6 +18,7 @@ export function Logo({ size = "text-2xl" }: { size?: string }) {
 
 const LINKS = [
   { href: "/arsenal", label: "Arsenal" },
+  { href: "/forge", label: "Forge" },
   { href: "/how-to-play", label: "How to Play" },
   { href: "/about", label: "About" },
 ];

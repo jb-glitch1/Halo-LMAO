@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Engine, GUN_LADDER } from "../engine";
 import "../bots"; // side-effect: registers the bot brain with the engine
 import { MAPS, MAP_LIST, generateMap, registerMap } from "../maps";
+import { encodeForge, decodeForge, buildForgeMap, type ForgeData } from "../forge";
 import REG from "../../shared/registry.js";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
 import { raycastWorld } from "../physics";
@@ -413,6 +414,27 @@ test("generated arenas are valid: spawns present, players land on ground, in bou
       assert.ok(Number.isFinite(p.pos.y) && p.pos.y > C.FALL_KILL_Y, `${m.id}: not in the void`);
       assert.ok(Math.abs(p.pos.x) <= m.size + 1 && Math.abs(p.pos.z) <= m.size + 1, `${m.id}: in bounds`);
     }
+  }
+});
+
+test("forge: share codes round-trip, reject garbage, and built maps are playable", () => {
+  const d: ForgeData = { v: 1, n: "Test Arena", c: [[0, 2, 1], [3, -4, 2], [-3, 4, 2], [5, 5, 3]] };
+  const code = encodeForge(d);
+  const back = decodeForge(code)!;
+  assert.equal(back.n, "Test Arena");
+  assert.equal(back.c.length, 4);
+  assert.equal(decodeForge("!!not-a-code!!"), null, "garbage rejected");
+  assert.equal(decodeForge(encodeForge({ v: 1, n: "x", c: [[99, 0, 1]] as any })), null, "out-of-grid rejected");
+
+  const m = registerMap(buildForgeMap(back));
+  const e = new Engine(cfg({ mapId: m.id }));
+  e.addPlayer("a", { name: "a", team: "red", isBot: false });
+  e.addPlayer("b", { name: "b", team: "blue", isBot: false });
+  e.start(0);
+  for (let i = 0; i < 30; i++) e.step(1 / 60, 4000 + i * 16);
+  for (const p of e.players.values()) {
+    assert.ok(p.alive, "player alive on forge map");
+    assert.ok(p.pos.y > C.FALL_KILL_Y && Math.abs(p.pos.x) <= m.size && Math.abs(p.pos.z) <= m.size, "in bounds");
   }
 });
 

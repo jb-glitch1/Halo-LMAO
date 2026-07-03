@@ -8,6 +8,7 @@ import Lobby from "@/components/Lobby";
 import { getSocket, LobbyClient, HostSession, ClientSession, SessionLike } from "@/game/net";
 import type { RoomInfo, MatchConfig, SkullId } from "@/game/types";
 import { MAP_LIST, generateMap, registerMap } from "@/game/maps";
+import { decodeForge, buildForgeMap } from "@/game/forge";
 import { LOADOUTS } from "@/game/weapons";
 import { SPARTAN_COLORS, hexc } from "@/game/constants";
 
@@ -77,6 +78,18 @@ function PlayInner() {
     if (search.get("host") === "1" && !autoHosted.current) {
       autoHosted.current = true;
       hostRoom();
+    }
+    // handoff from /forge: load the pending map and jump into solo setup
+    if (search.get("forge") === "1") {
+      try {
+        const pending = localStorage.getItem("lmao_forge_pending");
+        const d = pending ? decodeForge(pending) : null;
+        if (d) {
+          const m = registerMap(buildForgeMap(d));
+          soloCfgRef.current = { ...soloCfgRef.current, mapId: m.id };
+          setView("solo");
+        }
+      } catch { /* storage unavailable */ }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -338,6 +351,11 @@ function SoloSetup({ onStart, onBack, initial }: { onStart: (c: MatchConfig) => 
             >
               🎲 {cfg.mapId.startsWith("gen_") ? "Random arena ready — roll again" : "Generate a Random Arena"}
             </button>
+            {cfg.mapId.startsWith("forge_") && (
+              <div className="mt-2 chip bg-temu-gold/10 border border-temu-gold/40 text-temu-gold">
+                🔧 Forge map loaded — Start uses your custom arena
+              </div>
+            )}
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
