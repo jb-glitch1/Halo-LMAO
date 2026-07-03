@@ -26,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Fonts load at runtime; gracefully falls back to system fonts if offline. */}
+        {/* Fonts load at runtime; gracefully falls back to system fonts if offline.
+            (Pages-Router lint rule doesn't apply: this root layout wraps every page.) */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
           rel="stylesheet"

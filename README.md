@@ -110,3 +110,7 @@ connected to any existing game, franchise, "Master Chief," "Spartan," energy swo
 ring. Every name is intentionally goofy and legally distinct.
 
 Built with Next.js, React, Three.js & Socket.IO.
+
+**Note:** the Google Fonts stylesheet (Oswald / JetBrains Mono) is the only external
+runtime dependency — everything else is procedural and served from this process. If the
+CDN is unreachable the UI falls back to system fonts.
