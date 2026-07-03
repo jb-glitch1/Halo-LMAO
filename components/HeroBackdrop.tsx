@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 // Deterministic PRNG so server and client render identical stars (no hydration mismatch).
 function mulberry32(seed: number) {
@@ -18,8 +18,11 @@ function mulberry32(seed: number) {
  * parallax. Renders nothing heavy — the game bundle is never pulled in here.
  */
 export default function HeroBackdrop() {
-  const [par, setPar] = useState({ x: 0, y: 0 });
-  const reduce = useRef(false);
+  // Parallax is applied straight to the layers via refs + rAF — routing every
+  // mousemove through React state re-rendered the whole 80-star scene.
+  const starsRef = useRef<SVGSVGElement>(null);
+  const ringRef = useRef<SVGSVGElement>(null);
+  const ridgeRef = useRef<SVGSVGElement>(null);
 
   const stars = useMemo(() => {
     const rnd = mulberry32(20240611);
@@ -33,15 +36,24 @@ export default function HeroBackdrop() {
   }, []);
 
   useEffect(() => {
-    reduce.current = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    if (reduce.current) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
     const onMove = (e: MouseEvent) => {
       const x = (e.clientX / window.innerWidth - 0.5) * 2;
       const y = (e.clientY / window.innerHeight - 0.5) * 2;
-      setPar({ x, y });
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (starsRef.current) starsRef.current.style.transform = `translate(${x * 4}px, ${y * 4}px)`;
+        if (ringRef.current) ringRef.current.style.transform = `translate(${x * 12}px, ${y * 7}px)`;
+        if (ridgeRef.current) ridgeRef.current.style.transform = `translate(${x * -5}px, 0)`;
+      });
     };
     window.addEventListener("mousemove", onMove, { passive: true });
-    return () => window.removeEventListener("mousemove", onMove);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   return (
@@ -64,8 +76,7 @@ export default function HeroBackdrop() {
       />
 
       {/* stars */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none"
-        style={{ transform: `translate(${par.x * 4}px, ${par.y * 4}px)` }}>
+      <svg ref={starsRef} className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
         {stars.map((s, i) => (
           <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#cfe0ff" opacity={s.o}
             className="hero-twinkle" style={{ animationDelay: `${s.d}s` }} />
@@ -73,8 +84,7 @@ export default function HeroBackdrop() {
       </svg>
 
       {/* the ring arcing across the sky */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice"
-        style={{ transform: `translate(${par.x * 12}px, ${par.y * 7}px)` }}>
+      <svg ref={ringRef} className="absolute inset-0 w-full h-full" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice">
         <defs>
           <filter id="ringglow" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="10" />
@@ -90,8 +100,8 @@ export default function HeroBackdrop() {
       </svg>
 
       {/* foreground ridge silhouette */}
-      <svg className="absolute inset-x-0 bottom-0 w-full" viewBox="0 0 1000 220" preserveAspectRatio="none"
-        style={{ height: "32%", transform: `translate(${par.x * -5}px, 0)` }}>
+      <svg ref={ridgeRef} className="absolute inset-x-0 bottom-0 w-full" viewBox="0 0 1000 220" preserveAspectRatio="none"
+        style={{ height: "32%" }}>
         <path d="M0,220 L0,150 L120,120 L240,158 L360,104 L500,150 L640,96 L780,150 L880,120 L1000,160 L1000,220 Z"
           fill="#05070c" />
         <path d="M0,150 L120,120 L240,158 L360,104 L500,150 L640,96 L780,150 L880,120 L1000,160"

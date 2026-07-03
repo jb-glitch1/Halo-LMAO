@@ -27,6 +27,7 @@ export class InputManager {
   setTouchActive(v: boolean) {
     this.touch = v;
     if (v) this.locked = true; // no pointer lock on touch; treat as active
+    else this.locked = typeof document !== "undefined" && document.pointerLockElement === this.el;
   }
   setTouchMove(x: number, z: number) {
     this.t.mx = x;

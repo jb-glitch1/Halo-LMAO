@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Logo } from "@/components/Nav";
 import Lobby from "@/components/Lobby";
@@ -66,6 +68,17 @@ function PlayInner() {
       if (p.name) setName(p.name);
       if (typeof p.color === "number") setColor(p.color);
     } catch { /* noop */ }
+  }, []);
+
+  // deep link: the homepage's "Host a Room" CTA points at /play?host=1
+  const search = useSearchParams();
+  const autoHosted = useRef(false);
+  useEffect(() => {
+    if (search.get("host") === "1" && !autoHosted.current) {
+      autoHosted.current = true;
+      hostRoom();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     localStorage.setItem("lmao_profile", JSON.stringify({ name, color }));
@@ -198,7 +211,7 @@ function PlayInner() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-10">
           <Logo />
-          <a href="/" className="btn-ghost !py-2 !px-4">← Home</a>
+          <Link href="/" className="btn-ghost !py-2 !px-4">← Home</Link>
         </div>
 
         {err && <div className="panel border-temu-red/50 p-3 mb-4 text-temu-red text-sm flex items-center justify-between"><span>⚠ {err}</span><button onClick={() => setErr("")} className="text-hud-amber/50">✕</button></div>}
@@ -264,7 +277,8 @@ function CareerPanel() {
   if (!c) return null;
   const kd = c.deaths ? (c.kills / c.deaths).toFixed(2) : (c.kills || 0).toFixed(2);
   const acc = c.shotsFired ? Math.round((c.shotsHit / c.shotsFired) * 100) : 0;
-  const wr = c.matches ? Math.round((c.wins / c.matches) * 100) : 0;
+  const decided = c.matches - (c.draws || 0); // win rate over decided matches
+  const wr = decided > 0 ? Math.round((c.wins / decided) * 100) : 0;
   const cells: [string, string | number][] = [
     ["Matches", c.matches], ["Wins", `${c.wins} (${wr}%)`], ["Kills", c.kills],
     ["K/D", kd], ["Accuracy", `${acc}%`], ["Best streak", c.bestStreak || 0],

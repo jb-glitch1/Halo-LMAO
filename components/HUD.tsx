@@ -13,6 +13,7 @@ export interface HudModel {
   maxShield: number;
   overshield: boolean;
   weaponName: string;
+  weaponId: string;
   weaponColor: string;
   mag: number;
   reserve: number;
@@ -209,7 +210,7 @@ export default function HUD({ m }: { m: HudModel }) {
         ) : (
         <div className="panel2 px-3 py-2 inline-block">
           <div className="text-[10px] uppercase tracking-widest text-hud-amber/60 truncate max-w-[200px]" style={{ color: m.weaponColor }}>
-            {WEAPON_ICON[Object.keys(WEAPON_ICON).find((k) => m.weaponName.toLowerCase().includes(k)) || ""] || "🔫"} {m.weaponName}
+            {WEAPON_ICON[m.weaponId] || "🔫"} {m.weaponName}
           </div>
           <div className="flex items-baseline justify-end gap-1.5">
             {m.reloading > 0 ? (
@@ -291,7 +292,6 @@ function Crosshair({ spread, hit }: { spread: number; hit: HudModel["hitmarker"]
 function ScopeOverlay() {
   return (
     <div className="absolute inset-0">
-      <div className="absolute inset-0 bg-black" style={{ clipPath: "polygon(0 0,100% 0,100% 100%,0 100%, 0 0, 50% 50%)", display: "none" }} />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black" style={{ width: "70vh", height: "70vh", boxShadow: "0 0 0 100vmax rgba(0,0,0,0.55)" }} />
       <div className="absolute top-1/2 left-0 w-full h-px bg-hud-red/60" />
       <div className="absolute left-1/2 top-0 h-full w-px bg-hud-red/60" />

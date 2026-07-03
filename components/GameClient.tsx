@@ -43,14 +43,15 @@ function loadSettings(): Record<string, any> {
 }
 
 // Accumulate lifetime stats (the "Loyalty Program") into localStorage at match end.
-function recordCareer(self: PlayerState | undefined, won: boolean) {
+function recordCareer(self: PlayerState | undefined, outcome: "win" | "loss" | "draw") {
   if (typeof window === "undefined" || !self) return;
   let c: Record<string, number> = {};
   try { c = JSON.parse(localStorage.getItem("lmao_career") || "{}"); } catch { c = {}; }
   c.matches = (c.matches || 0) + 1;
   c.kills = (c.kills || 0) + self.kills;
   c.deaths = (c.deaths || 0) + self.deaths;
-  c.wins = (c.wins || 0) + (won ? 1 : 0);
+  c.wins = (c.wins || 0) + (outcome === "win" ? 1 : 0);
+  c.draws = (c.draws || 0) + (outcome === "draw" ? 1 : 0);
   c.bestStreak = Math.max(c.bestStreak || 0, self.longestStreak || 0);
   c.shotsFired = (c.shotsFired || 0) + (self.shotsFired || 0);
   c.shotsHit = (c.shotsHit || 0) + (self.shotsHit || 0);
@@ -80,7 +81,14 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   const [colorblind, setColorblind] = useState<boolean>(() => loadSettings().colorblind ?? false);
   const colorblindRef = useRef(colorblind);
   const liveRef = useRef(false);
-  const [isTouch] = useState(() => typeof window !== "undefined" && (("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0));
+  // Touch UI defaults on only for coarse-pointer devices (phones/tablets), so
+  // touchscreen laptops with a mouse keep pointer-lock play. User-overridable.
+  const [touchUI, setTouchUI] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const saved = loadSettings().touchUI;
+    if (typeof saved === "boolean") return saved;
+    return window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  });
 
   // event-dedupe + transient refs
   const lastFx = useRef(0);
@@ -110,7 +118,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     imRef.current = im;
     im.setSensitivity((sens / 1000));
     im.setInvertY(invertY);
-    if (isTouch) im.setTouchActive(true);
+    if (touchUI) im.setTouchActive(true);
 
     im.onPause = () => {
       if (!endedRef.current) {
@@ -128,6 +136,28 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
 
     const onResize = () => renderer.resize();
     window.addEventListener("resize", onResize);
+
+    // If the HOST tab is hidden, rAF suspends and the whole online match would
+    // freeze for every client — keep the authoritative sim ticking on a timer.
+    let hiddenTimer = 0;
+    let hiddenLast = 0;
+    const onVis = () => {
+      if (document.hidden && online && isHost) {
+        if (!hiddenTimer) {
+          hiddenLast = performance.now();
+          hiddenTimer = window.setInterval(() => {
+            const t = performance.now();
+            const dtMs = Math.min(100, t - hiddenLast);
+            hiddenLast = t;
+            session.update(dtMs, t, imRef.current!.poll());
+          }, 50);
+        }
+      } else if (hiddenTimer) {
+        window.clearInterval(hiddenTimer);
+        hiddenTimer = 0;
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
 
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Tab") { e.preventDefault(); sbRef.current = true; setScoreboard(true); }
@@ -180,6 +210,8 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVis);
+      if (hiddenTimer) window.clearInterval(hiddenTimer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
       im.unbind();
@@ -201,11 +233,12 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
   useEffect(() => { imRef.current?.setInvertY(invertY); }, [invertY]);
   useEffect(() => { rendererRef.current?.setReduceMotion(reduceMotion); }, [reduceMotion]);
   useEffect(() => { colorblindRef.current = colorblind; }, [colorblind]);
+  useEffect(() => { imRef.current?.setTouchActive(touchUI); }, [touchUI]);
   useEffect(() => {
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sens, vol, gfx, announcer, fov, invertY, reduceMotion, colorblind }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sens, vol, gfx, announcer, fov, invertY, reduceMotion, colorblind, touchUI }));
     } catch { /* storage unavailable */ }
-  }, [sens, vol, gfx, announcer, fov, invertY, reduceMotion, colorblind]);
+  }, [sens, vol, gfx, announcer, fov, invertY, reduceMotion, colorblind, touchUI]);
 
   const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -358,6 +391,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
       maxShield: MAX_SHIELD,
       overshield: (self?.shield ?? 0) > MAX_SHIELD + 1,
       weaponName: def.name,
+      weaponId: def.id,
       weaponColor: hexc(def.color),
       mag: ammo.mag, reserve: ammo.reserve, reserveInfinite: def.reserveMax === 0,
       reloading: Math.max(0, Math.min(1, reloading)),
@@ -425,17 +459,25 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     setEnded(true);
     audio.announce(winnerText);
 
-    // lifetime stats
+    // lifetime stats (draws tracked separately so they don't read as losses)
     const self = snap.players.find((p) => p.id === localId);
-    let won = false;
-    if (snap.mode === "infection") won = !self?.infected;
-    else if (useTeams) won = !!self && self.team === (snap.teamScore.red > snap.teamScore.blue ? "red" : snap.teamScore.blue > snap.teamScore.red ? "blue" : "none");
-    else won = [...snap.players].sort((a, b) => b.score - a.score)[0]?.id === localId;
-    recordCareer(self, won);
+    let outcome: "win" | "loss" | "draw" = "loss";
+    if (snap.mode === "infection") {
+      outcome = self?.infected ? "loss" : "win";
+    } else if (useTeams) {
+      if (snap.teamScore.red === snap.teamScore.blue) outcome = "draw";
+      else outcome = self?.team === (snap.teamScore.red > snap.teamScore.blue ? "red" : "blue") ? "win" : "loss";
+    } else {
+      const sorted = [...snap.players].sort((a, b) => b.score - a.score);
+      const meTop = sorted[0]?.id === localId;
+      const tiedTop = sorted.length > 1 && sorted[0].score === sorted[1].score;
+      outcome = meTop ? (tiedTop ? "draw" : "win") : tiedTop && sorted[1]?.id === localId ? "draw" : "loss";
+    }
+    recordCareer(self, outcome);
   }, [audio, localId]);
 
   const resume = () => {
-    if (isTouch) { pausedRef.current = false; setPaused(false); }
+    if (touchUI) { pausedRef.current = false; setPaused(false); }
     else imRef.current?.requestLock();
   };
 
@@ -445,12 +487,16 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
 
       {hud && <HUD m={hud} />}
 
-      {isTouch && hud && !paused && !ended && imRef.current && (
-        <TouchControls im={imRef.current} onPause={() => { pausedRef.current = true; setPaused(true); }} />
+      {touchUI && hud && !paused && !ended && imRef.current && (
+        <TouchControls
+          im={imRef.current}
+          onPause={() => { pausedRef.current = true; setPaused(true); }}
+          onScoreboard={(v) => { sbRef.current = v; setScoreboard(v); }}
+        />
       )}
 
       {/* click-to-start prompt when not locked and not paused/ended */}
-      {!isTouch && !paused && !ended && hud && !imLocked() && (
+      {!touchUI && !paused && !ended && hud && !imLocked() && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="panel px-6 py-4 text-center pointer-events-none">
             <div className="text-hud-amber font-bold text-lg">Click to lock mouse & play</div>
@@ -496,6 +542,10 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
                 <label className="flex items-center gap-2 text-sm text-hud-amber/70">
                   <input type="checkbox" checked={colorblind} onChange={(e) => setColorblind(e.target.checked)} />
                   Colorblind radar (shapes)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-hud-amber/70">
+                  <input type="checkbox" checked={touchUI} onChange={(e) => setTouchUI(e.target.checked)} />
+                  Touch controls (on-screen stick)
                 </label>
                 <div>
                   <label className="label">Graphics</label>

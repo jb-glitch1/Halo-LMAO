@@ -5,6 +5,7 @@ import type { InputManager } from "@/game/input";
 function TouchBtn({ im, name, label, cls }: { im: InputManager; name: string; label: string; cls: string }) {
   return (
     <button
+      aria-label={name}
       className={`grid place-items-center rounded-full bg-black/40 border border-hud-cyan/40 text-hud-cyan font-bold leading-none active:bg-hud-cyan/30 ${cls}`}
       onPointerDown={(e) => { e.preventDefault(); im.setTouchBtn(name, true); }}
       onPointerUp={(e) => { e.preventDefault(); im.setTouchBtn(name, false); }}
@@ -17,8 +18,8 @@ function TouchBtn({ im, name, label, cls }: { im: InputManager; name: string; la
 }
 
 // On-screen controls for touch devices: left thumbstick (move), right-side drag
-// (look), and action buttons. Rendered only on touch devices.
-export default function TouchControls({ im, onPause }: { im: InputManager; onPause: () => void }) {
+// (look), and action buttons. Rendered only when the touch UI is enabled.
+export default function TouchControls({ im, onPause, onScoreboard }: { im: InputManager; onPause: () => void; onScoreboard: (open: boolean) => void }) {
   const R = 56;
   const stick = useRef<{ id: number; ox: number; oy: number } | null>(null);
   const look = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -64,7 +65,17 @@ export default function TouchControls({ im, onPause }: { im: InputManager; onPau
       {/* look layer — captures drags anywhere not covered by a control */}
       <div className="absolute inset-0" onPointerDown={lookDown} onPointerMove={lookMove} onPointerUp={lookUp} onPointerCancel={lookUp} />
 
-      <button onClick={onPause} className="absolute top-2 right-2 bg-black/40 border border-hud-line rounded px-3 py-1 text-hud-amber text-sm">⏸</button>
+      <button aria-label="pause" onClick={onPause} className="absolute top-2 right-2 bg-black/40 border border-hud-line rounded px-3 py-1 text-hud-amber text-sm">⏸</button>
+      <button
+        aria-label="scoreboard (hold)"
+        className="absolute top-2 right-14 bg-black/40 border border-hud-line rounded px-3 py-1 text-hud-amber text-sm"
+        onPointerDown={(e) => { e.preventDefault(); onScoreboard(true); }}
+        onPointerUp={() => onScoreboard(false)}
+        onPointerLeave={() => onScoreboard(false)}
+        onPointerCancel={() => onScoreboard(false)}
+      >
+        ▤
+      </button>
 
       {/* movement stick (bottom-left) */}
       <div
