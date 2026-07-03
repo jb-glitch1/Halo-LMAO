@@ -127,7 +127,6 @@ export interface WeaponDef {
   color: number; // tracer / model accent
   isPower?: boolean;
   vehicleOnly?: boolean; // mounted weapons — hidden from the arsenal/loadouts
-  emptyHint?: string;
 }
 
 export type PowerupId = "overshield" | "speed" | "damage" | "camo";
@@ -213,7 +212,6 @@ export interface PlayerState {
   hitFlash: number;
   grounded: boolean;
   moving: boolean;
-  ping?: number;
   // infection (Black Friday): role flag, true once "value-acquired"
   infected?: boolean;
   // CTF: which team's banner this player is carrying (null = none)

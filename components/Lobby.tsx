@@ -4,7 +4,7 @@ import type { LobbyClient } from "@/game/net";
 import type { RoomInfo, MatchConfig, Team } from "@/game/types";
 import { MAP_LIST } from "@/game/maps";
 import { LOADOUTS } from "@/game/weapons";
-import { SPARTAN_COLORS } from "@/game/constants";
+import { SPARTAN_COLORS, hexc } from "@/game/constants";
 
 const MODES: { id: MatchConfig["mode"]; name: string; teams: boolean }[] = [
   { id: "slayer", name: "Slayer (FFA)", teams: false },
@@ -18,7 +18,6 @@ const MODES: { id: MatchConfig["mode"]; name: string; teams: boolean }[] = [
 const SKILLS = [
   { v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.75, n: "ODST" }, { v: 0.95, n: "Legendary" },
 ];
-function hexc(n: number) { return "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6); }
 
 export default function Lobby({ lobby, room, selfId, onLeave }: { lobby: LobbyClient; room: RoomInfo; selfId: string; onLeave: () => void }) {
   const me = room.players.find((p) => p.id === selfId);

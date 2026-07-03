@@ -1,5 +1,5 @@
 import type { Engine } from "./engine";
-import { registerBotThink } from "./engine";
+import { registerBotThink, emptyInput } from "./engine";
 import type { PlayerState, PlayerInput } from "./types";
 import * as C from "./constants";
 import { weaponDef } from "./weapons";
@@ -34,9 +34,16 @@ interface BotMem {
   lastPos: Vec3;
 }
 
-const mem = new Map<string, BotMem>();
+// Per-engine bot memory (WeakMap) so waypoints/targets never leak between
+// matches — bot ids are reused, and a module-global Map carried stale state.
+const engineMem = new WeakMap<Engine, Map<string, BotMem>>();
 
-function getMem(id: string, now: number): BotMem {
+function getMem(e: Engine, id: string, now: number): BotMem {
+  let mem = engineMem.get(e);
+  if (!mem) {
+    mem = new Map();
+    engineMem.set(e, mem);
+  }
   let m = mem.get(id);
   if (!m) {
     m = {
@@ -74,34 +81,13 @@ function canSee(e: Engine, from: Vec3, to: Vec3): boolean {
   return !w || w.t >= dist - 0.5;
 }
 
-function emptyInput(now: number): PlayerInput {
-  return {
-    moveX: 0,
-    moveZ: 0,
-    yaw: 0,
-    pitch: 0,
-    jump: false,
-    crouch: false,
-    sprint: false,
-    fire: false,
-    altFire: false,
-    reload: false,
-    throwGrenade: false,
-    grenadeType: "frag",
-    switchWeapon: -1,
-    zoom: false,
-    pickup: false,
-    seq: now,
-  };
-}
-
 function angleLerp(a: number, b: number, t: number): number {
   let d = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   return a + d * t;
 }
 
 export function botThink(e: Engine, bot: PlayerState, now: number) {
-  const m = getMem(bot.id, now);
+  const m = getMem(e, bot.id, now);
   const input = emptyInput(now);
   const skill = clamp(bot.botSkill ?? 0.5, 0, 1);
   const eye = eyeOf(bot);

@@ -20,7 +20,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     movingSpreadDeg: 1.4,
     range: 70,
     color: 0xdfe6ee,
-    emptyHint: "*sad click* — reload (R)",
   },
   magnum: {
     id: "magnum",
@@ -264,8 +263,6 @@ export const LOADOUTS: Loadout[] = [
 export function loadoutById(id: string): Loadout {
   return LOADOUTS.find((l) => l.id === id) || LOADOUTS[0];
 }
-
-export const POWER_WEAPONS = ["shotgun", "sniper", "rocket", "needler", "sword"];
 
 export function weaponDef(id: string): WeaponDef {
   return WEAPONS[id] || WEAPONS.ar;

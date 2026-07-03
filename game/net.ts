@@ -143,18 +143,15 @@ export class HostSession implements SessionLike {
       this.accum -= this.fixed;
       steps++;
     }
-    const snap = this.engine.snapshot();
-    this.lastSnap = snap;
-    if (this.socket && now - this.lastBroadcast >= 1000 / SNAPSHOT_HZ) {
+    // Build the (fairly expensive) full snapshot only at broadcast cadence —
+    // remote players already interpolate between 20Hz states, and the local
+    // player renders from live engine state via getLocalRender().
+    if (!this.lastSnap || now - this.lastBroadcast >= 1000 / SNAPSHOT_HZ) {
       this.lastBroadcast = now;
-      this.socket.emit("snapshot", { code: this.roomCode, snap });
+      const snap = this.engine.snapshot();
+      this.lastSnap = snap;
+      if (this.socket) this.socket.emit("snapshot", { code: this.roomCode, snap });
       this.engine.drainEvents();
-    } else if (!this.socket) {
-      // solo: drain at snapshot cadence so renderer dedupe stays bounded
-      if (now - this.lastBroadcast >= 1000 / SNAPSHOT_HZ) {
-        this.lastBroadcast = now;
-        this.engine.drainEvents();
-      }
     }
   }
 

@@ -106,7 +106,6 @@ interface Fx {
   light?: THREE.PointLight;
 }
 
-const TEAM_HEX = { red: 0xff4d5e, blue: 0x3aa0ff, ffa: 0xffcf4d };
 // In-world holographic marker palette — mirrors the 2D HUD color doctrine
 // (cyan = system/tech, amber = neutral objective, purple = relic).
 const MARKER = { lift: 0x36e7ff, hill: 0xffcf4d, oddball: 0xb06bff };
@@ -321,6 +320,9 @@ export class Renderer {
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.geometry) m.geometry.dispose?.();
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((x) => x?.dispose?.());
+      else mat?.dispose?.();
     });
     for (const g of this.geoCache.values()) g.dispose();
     for (const m of this.matCache.values()) m.dispose();
@@ -559,7 +561,7 @@ export class Renderer {
     let v = this.players.get(p.id);
     if (v) return v;
     const group = new THREE.Group();
-    const teamHex = p.infected ? 0x67e36a : TEAM_HEX[p.team] ?? 0xcccccc;
+    const teamHex = p.infected ? 0x67e36a : TEAM_COLOR[p.team] ?? 0xcccccc;
     const armorMat = new THREE.MeshStandardMaterial({ color: teamHex, metalness: 0.5, roughness: 0.42 });
     const darkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(teamHex).multiplyScalar(0.45), metalness: 0.55, roughness: 0.4 });
     const trimMat = new THREE.MeshStandardMaterial({ color: teamHex, emissive: teamHex, emissiveIntensity: 0.5, metalness: 0.3, roughness: 0.4 });
@@ -716,7 +718,7 @@ export class Renderer {
         const fi = snap.flags[team];
         let g = this.flagVisuals.get(team);
         if (!g) {
-          g = this.makeFlag(team === "red" ? TEAM_HEX.red : TEAM_HEX.blue);
+          g = this.makeFlag(team === "red" ? TEAM_COLOR.red : TEAM_COLOR.blue);
           this.scene.add(g);
           this.flagVisuals.set(team, g);
         }
@@ -872,7 +874,7 @@ export class Renderer {
 
   // ---------- fx ----------
   spawnFx(f: FxEvent, now: number) {
-    const col = f.team ? TEAM_HEX[f.team] : 0xffffff;
+    const col = f.team ? TEAM_COLOR[f.team] : 0xffffff;
     switch (f.kind) {
       case "tracer": {
         if (!f.pos2) return;
@@ -942,7 +944,7 @@ export class Renderer {
       }
       case "spawn":
       case "pickup": {
-        const c = f.kind === "spawn" ? (f.team ? TEAM_HEX[f.team] : 0xffffff) : 0xffcf4d;
+        const c = f.kind === "spawn" ? (f.team ? TEAM_COLOR[f.team] : 0xffffff) : 0xffcf4d;
         const m = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.5, 20), new THREE.MeshBasicMaterial({ color: c, transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
         m.rotation.x = -Math.PI / 2;
         m.position.set(f.pos.x, f.pos.y + 0.1, f.pos.z);

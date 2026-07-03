@@ -53,7 +53,7 @@ export const MELEE_BACK_INSTAKILL = true; // assassination from behind
 export const MELEE_COOLDOWN_MS = 650;
 
 // Combat feel
-export const HEADSHOT_ZONE_Y = 1.35; // above feet => head
+export const HEADSHOT_ZONE_Y = PLAYER_HEIGHT - 0.32; // height above feet that counts as the head
 export const ASSIST_WINDOW_MS = 4000;
 
 // Multikill / spree timing
@@ -98,3 +98,6 @@ export const SPARTAN_COLORS = [
 ];
 
 export const TEAM_COLOR = { red: 0xff4d5e, blue: 0x3aa0ff, ffa: 0xffcf4d } as const;
+
+// Format a numeric color as a CSS hex string (shared by the UI layers).
+export const hexc = (n: number): string => "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6);

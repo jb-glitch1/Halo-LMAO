@@ -1,5 +1,5 @@
 import type { MapDef, Box, Ramp, SpawnPoint, PickupSpawn, JumpPad } from "./types";
-import { v3 } from "./vec";
+import { v3, mulberry32 } from "./vec";
 
 // ---- geometry helpers (axis-aligned only) ----
 function box(
@@ -455,16 +455,6 @@ export function getMap(id: string): MapDef {
 export function registerMap(m: MapDef): MapDef {
   MAPS[m.id] = m;
   return m;
-}
-
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return function () {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 // =====================================================================

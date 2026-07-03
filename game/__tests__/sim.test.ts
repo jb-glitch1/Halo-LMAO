@@ -6,19 +6,9 @@ import { MAPS, MAP_LIST, generateMap, registerMap } from "../maps";
 import REG from "../../shared/registry.js";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
 import { raycastWorld } from "../physics";
-import { v3, dirFromAngles } from "../vec";
+import { v3, dirFromAngles, mulberry32 } from "../vec";
 import * as C from "../constants";
 import type { MatchConfig, PlayerInput } from "../types";
-
-function prng(seed: number) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // The simulation is framework-free (no DOM / Three), so it runs headless in Node.
 // These tests are the ground truth for game behavior since the renderer can't be
@@ -357,7 +347,7 @@ test("ctf: grabbing the enemy banner and carrying it home scores a capture", () 
 });
 
 test("raycast broadphase matches the exhaustive result on every map", () => {
-  const rnd = prng(0x1234abcd);
+  const rnd = mulberry32(0x1234abcd);
   for (const m of MAP_LIST) {
     for (let i = 0; i < 250; i++) {
       const origin = v3((rnd() * 2 - 1) * m.size, rnd() * 9, (rnd() * 2 - 1) * m.size);

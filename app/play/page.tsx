@@ -9,7 +9,7 @@ import { getSocket, LobbyClient, HostSession, ClientSession, SessionLike } from 
 import type { RoomInfo, MatchConfig, SkullId } from "@/game/types";
 import { MAP_LIST, generateMap, registerMap } from "@/game/maps";
 import { LOADOUTS } from "@/game/weapons";
-import { SPARTAN_COLORS } from "@/game/constants";
+import { SPARTAN_COLORS, hexc } from "@/game/constants";
 
 const GameClient = dynamic(() => import("@/components/GameClient"), { ssr: false });
 
@@ -36,7 +36,6 @@ const SKULLS: { id: SkullId; name: string }[] = [
   { id: "famine", name: "Famine" },
   { id: "sugar", name: "Sugar Rush" },
 ];
-function hexc(n: number) { return "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6); }
 
 export default function PlayPage() {
   return (

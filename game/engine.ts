@@ -16,7 +16,7 @@ import type {
   VehicleState,
 } from "./types";
 import * as C from "./constants";
-import { weaponDef, loadoutById, POWER_WEAPONS } from "./weapons";
+import { weaponDef, loadoutById } from "./weapons";
 import { getMap } from "./maps";
 import { raycastWorld, rayCylinder, supportHeight, moveAndCollide } from "./physics";
 import { applyMovementStep } from "./movement";
@@ -33,6 +33,7 @@ import {
   flatForward,
   flatRight,
   clamp,
+  mulberry32,
 } from "./vec";
 
 export interface AddPlayerOpts {
@@ -54,7 +55,7 @@ interface FlagRuntime {
 // Gun Game weapon ladder (escalating, finishing on the energy butterknife).
 export const GUN_LADDER = ["magnum", "ar", "br", "dmr", "shotgun", "needler", "plasma", "sniper", "rocket", "sword"];
 
-const emptyInput = (): PlayerInput => ({
+export const emptyInput = (seq = 0): PlayerInput => ({
   moveX: 0,
   moveZ: 0,
   yaw: 0,
@@ -70,7 +71,7 @@ const emptyInput = (): PlayerInput => ({
   switchWeapon: -1,
   zoom: false,
   pickup: false,
-  seq: 0,
+  seq,
 });
 
 export class Engine {
@@ -672,7 +673,7 @@ export class Engine {
     const end = vadd(origin, vscale(dir, hitDist));
     this.pushFx("tracer", origin, p.team, d.id, undefined, end);
     if (hitP) {
-      const headshot = hitY - hitP.pos.y >= C.PLAYER_HEIGHT - 0.32;
+      const headshot = hitY - hitP.pos.y >= C.HEADSHOT_ZONE_Y;
       this.pushFx("impact", end, hitP.team, d.id);
       this.applyDamage(hitP, d.damage, p, d.id, headshot, now);
     } else if (wall) {
@@ -1737,7 +1738,8 @@ export class Engine {
       ...p,
       pos: { ...p.pos },
       vel: { ...p.vel },
-      ammo: p.ammo,
+      // deep-copied so the snapshot stays immutable after host-side mutation
+      ammo: Object.fromEntries(Object.entries(p.ammo).map(([w, a]) => [w, { ...a }])),
     }));
     const snap: Snapshot = {
       t: this.now,
@@ -1789,17 +1791,6 @@ export class Engine {
 // helper cross without importing more
 function cross(a: Vec3, b: Vec3): Vec3 {
   return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
-}
-
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 const MULTIKILL_NAMES = [

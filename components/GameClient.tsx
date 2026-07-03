@@ -6,7 +6,7 @@ import { Renderer, type GraphicsQuality } from "@/game/renderer";
 import { InputManager } from "@/game/input";
 import { getAudio } from "@/game/audio";
 import { weaponDef } from "@/game/weapons";
-import { MAX_SHIELD } from "@/game/constants";
+import { MAX_SHIELD, KILLFEED_KEEP, hexc } from "@/game/constants";
 import { GUN_LADDER } from "@/game/engine";
 import type { SessionLike } from "@/game/net";
 import type { Snapshot, PlayerState } from "@/game/types";
@@ -26,7 +26,6 @@ const MODE_LABEL: Record<string, string> = {
 };
 const POWERUP_COLOR: Record<string, string> = { overshield: "#36e7ff", speed: "#ffcf4d", damage: "#ff4d5e", camo: "#b06bff" };
 
-function hexc(n: number) { return "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6); }
 function fmtTime(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
@@ -339,7 +338,7 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
     }
 
     // killfeed
-    const killfeed: KillRow[] = snap.kills.slice(-5).map((k) => {
+    const killfeed: KillRow[] = snap.kills.slice(-KILLFEED_KEEP).map((k) => {
       const kp = snap.players.find((p) => p.id === k.killer);
       const vp = snap.players.find((p) => p.id === k.victim);
       const tcol = (t?: string) => (t === "red" ? 0xff4d5e : t === "blue" ? 0x3aa0ff : 0xffcf4d);
