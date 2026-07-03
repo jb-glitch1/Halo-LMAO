@@ -337,6 +337,30 @@ test("gun game: kills climb the weapon ladder and finishing it ends the match", 
   assert.equal(e.phase, "over", "completing the ladder ends the match");
 });
 
+test("juggernaut: crown starts on a bot, transfers on kill, bounty pays x3", () => {
+  const e = new Engine(cfg({ mode: "juggernaut", scoreLimit: 50 }));
+  e.addPlayer("h1", { name: "h1", team: "ffa", isBot: false });
+  e.addPlayer("h2", { name: "h2", team: "ffa", isBot: false });
+  e.addPlayer("b1", { name: "b1", team: "ffa", isBot: true });
+  e.start(0);
+  e.step(1 / 60, 4000);
+  const jugs = [...e.players.values()].filter((p) => p.isJuggernaut);
+  assert.equal(jugs.length, 1, "exactly one juggernaut");
+  assert.ok(jugs[0].isBot, "initial crown prefers a bot");
+  const jug = jugs[0];
+  assert.ok(jug.shield > jug.maxShield, "juggernaut spawns overshielded");
+
+  const hunter = e.players.get("h1")!;
+  e.killPlayer(jug, hunter, "ar", false, 4000);
+  assert.equal(jug.isJuggernaut, false, "crown leaves the slain");
+  assert.equal(hunter.isJuggernaut, true, "killer is crowned");
+  assert.equal(hunter.score, 3, "bounty pays x3");
+
+  const bystander = e.players.get("h2")!;
+  e.killPlayer(bystander, hunter, "ar", false, 4001);
+  assert.equal(hunter.score, 4, "juggernaut kills pay 1");
+});
+
 test("ctf: grabbing the enemy banner and carrying it home scores a capture", () => {
   const e = new Engine(cfg({ mode: "ctf", scoreLimit: 3 }));
   e.addPlayer("r", { name: "r", team: "red", isBot: false });

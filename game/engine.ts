@@ -140,6 +140,7 @@ export class Engine {
     this.initMode(now);
     this.initVehicles(now);
     if (this.config.mode === "infection") this.setupInfection();
+    if (this.config.mode === "juggernaut") this.setupJuggernaut();
     this.announce("GET READY", "Match starts in a sec…", true);
     for (const p of this.players.values()) this.spawnPlayer(p, now, true);
   }
@@ -164,6 +165,19 @@ export class Engine {
       pool[i].team = "red";
       pool[i].infected = true;
     }
+  }
+
+  // Crown one starting juggernaut (prefer a bot so a solo human starts hunting).
+  setupJuggernaut() {
+    const all = [...this.players.values()];
+    for (const p of all) {
+      p.team = "ffa";
+      p.isJuggernaut = false;
+    }
+    const pool = all
+      .slice()
+      .sort((a, b) => (a.isBot === b.isBot ? this.rng() - 0.5 : a.isBot ? -1 : 1));
+    if (pool[0]) pool[0].isJuggernaut = true;
   }
 
   initVehicles(now: number) {
@@ -369,6 +383,11 @@ export class Engine {
     if (this.hasSkull("famine")) {
       for (const w of Object.keys(p.ammo)) p.ammo[w].reserve = Math.floor(p.ammo[w].reserve * 0.4);
     }
+    // juggernaut wears an overshield and permanent speed
+    if (this.config.mode === "juggernaut" && p.isJuggernaut) {
+      p.shield = p.maxShield + C.OVERSHIELD_AMOUNT;
+      p.powerups = { ...p.powerups, speed: now + 9_000_000 };
+    }
     this.pushFx("spawn", p.pos, p.team);
   }
 
@@ -415,7 +434,7 @@ export class Engine {
   }
   isEnemy(a: PlayerState, b: PlayerState) {
     if (a.id === b.id) return false;
-    if (this.config.mode === "slayer" || this.config.mode === "gungame") return true; // FFA
+    if (this.config.mode === "slayer" || this.config.mode === "gungame" || this.config.mode === "juggernaut") return true; // FFA
     return !this.sameTeam(a.team, b.team);
   }
 
@@ -1186,6 +1205,21 @@ export class Engine {
       }
     }
 
+    // ---- juggernaut: crown transfers; hunters are paid a bounty ----
+    if (this.config.mode === "juggernaut" && attacker && attacker.id !== victim.id) {
+      if (victim.isJuggernaut) {
+        victim.isJuggernaut = false;
+        attacker.isJuggernaut = true;
+        attacker.score += 3;
+        attacker.shield = attacker.maxShield + C.OVERSHIELD_AMOUNT; // crowned on the spot
+        attacker.powerups.speed = now + 9_000_000;
+        this.announce("NEW JUGGERNAUT", `${attacker.name} takes the crown`, true);
+      } else if (attacker.isJuggernaut) {
+        attacker.score += 1;
+      }
+      if (attacker.score >= this.config.scoreLimit) this.endMatch("score");
+    }
+
     // ---- infection: a fallen survivor joins the horde ----
     if (this.config.mode === "infection" && !victim.infected) {
       victim.infected = true;
@@ -1708,6 +1742,7 @@ export class Engine {
         infection: "BLACK FRIDAY — survive the doorbuster horde",
         ctf: "CAPTURE THE BANNER — steal theirs, defend yours",
         gungame: "CLEARANCE LADDER — climb the weapon rack to win",
+        juggernaut: "JUGGERNAUT — slay the crowned, wear the crown",
       } as Record<string, string>
     )[this.config.mode];
   }

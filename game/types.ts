@@ -1,7 +1,7 @@
 import type { Vec3 } from "./vec";
 
 export type Team = "red" | "blue" | "ffa";
-export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection" | "ctf" | "gungame";
+export type GameModeId = "slayer" | "team" | "koth" | "oddball" | "infection" | "ctf" | "gungame" | "juggernaut";
 export type SkullId = "thrifty" | "boom" | "birthday" | "famine" | "sugar";
 
 export interface Box {
@@ -218,6 +218,8 @@ export interface PlayerState {
   carryingFlag?: Team | null;
   // Gun Game: current rung on the weapon ladder
   gunLevel?: number;
+  // Juggernaut: wearer of the crown (buffed, everyone hunts them)
+  isJuggernaut?: boolean;
   // vehicle occupancy
   vehicleId?: string | null;
   vehicleSeat?: "driver" | "gunner";

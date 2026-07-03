@@ -114,3 +114,7 @@ Built with Next.js, React, Three.js & Socket.IO.
 **Note:** the Google Fonts stylesheet (Oswald / JetBrains Mono) is the only external
 runtime dependency — everything else is procedural and served from this process. If the
 CDN is unreachable the UI falls back to system fonts.
+
+**License:** no license file yet, which legally means **all rights reserved** by the
+repository owner. If you want others to be able to use/modify this, add a LICENSE
+(MIT is the common choice for projects like this) — that's an owner decision.

@@ -14,6 +14,7 @@ const MODES: { id: MatchConfig["mode"]; name: string; teams: boolean }[] = [
   { id: "infection", name: "Black Friday", teams: false },
   { id: "ctf", name: "Capture the Banner", teams: true },
   { id: "gungame", name: "Clearance Ladder", teams: false },
+  { id: "juggernaut", name: "Juggernaut", teams: false },
 ];
 const SKILLS = [
   { v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.75, n: "ODST" }, { v: 0.95, n: "Legendary" },

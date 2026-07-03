@@ -27,6 +27,7 @@ const MODES = [
   { id: "infection", name: "Black Friday", d: "Survive the horde" },
   { id: "ctf", name: "Capture the Banner", d: "Steal their banner" },
   { id: "gungame", name: "Clearance Ladder", d: "Climb the gun rack" },
+  { id: "juggernaut", name: "Juggernaut", d: "Hunt the crowned" },
 ] as const;
 const SKILLS = [{ v: 0.3, n: "Recruit" }, { v: 0.55, n: "Marine" }, { v: 0.78, n: "ODST" }, { v: 0.95, n: "Legendary" }];
 const SKULLS: { id: SkullId; name: string }[] = [
@@ -149,7 +150,8 @@ function PlayInner() {
   function startSolo(cfg: MatchConfig) {
     soloCfgRef.current = cfg;
     const localId = "me";
-    const team = cfg.mode === "slayer" || cfg.mode === "infection" ? "ffa" : "red";
+    // team-pool modes get "red"; FFA-pool modes (slayer/infection/gungame/juggernaut) get "ffa"
+    const team = cfg.mode === "team" || cfg.mode === "koth" || cfg.mode === "oddball" || cfg.mode === "ctf" ? "red" : "ffa";
     const roster = [{ id: localId, name: profile().name, team, ready: true, isHost: true, loadout: cfg.startingLoadout, spartanColor: color }];
     const session = new HostSession({ socket: null, roomCode: "SOLO", localId, config: cfg, roster: roster as any });
     sessionRef.current = { session, localId, isHost: true, online: false };
@@ -313,7 +315,7 @@ function SoloSetup({ onStart, onBack, initial }: { onStart: (c: MatchConfig) => 
             <div className="label mb-2">Mode</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {MODES.map((m) => (
-                <button key={m.id} onClick={() => set({ mode: m.id, scoreLimit: m.id === "koth" || m.id === "oddball" ? 120 : m.id === "ctf" ? 3 : m.id === "gungame" ? 10 : 25 })} className={`p-2 rounded-lg border text-center ${cfg.mode === m.id ? "border-temu-orange bg-temu-orange/10" : "border-hud-line"}`}>
+                <button key={m.id} onClick={() => set({ mode: m.id, scoreLimit: m.id === "koth" || m.id === "oddball" ? 120 : m.id === "ctf" ? 3 : m.id === "gungame" ? 10 : m.id === "juggernaut" ? 15 : 25 })} className={`p-2 rounded-lg border text-center ${cfg.mode === m.id ? "border-temu-orange bg-temu-orange/10" : "border-hud-line"}`}>
                   <div className="text-sm font-bold text-hud-amber">{m.name}</div>
                   <div className="text-[10px] text-hud-amber/50">{m.d}</div>
                 </button>

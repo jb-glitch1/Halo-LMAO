@@ -96,6 +96,9 @@ interface PlayerVisual {
   targetYaw: number;
   team: Team;
   seen: boolean;
+  // role tints baked into the materials — visual is rebuilt when these change
+  infected: boolean;
+  jugg: boolean;
 }
 
 interface Fx {
@@ -561,7 +564,7 @@ export class Renderer {
     let v = this.players.get(p.id);
     if (v) return v;
     const group = new THREE.Group();
-    const teamHex = p.infected ? 0x67e36a : TEAM_COLOR[p.team] ?? 0xcccccc;
+    const teamHex = p.infected ? 0x67e36a : p.isJuggernaut ? 0xff4d5e : TEAM_COLOR[p.team] ?? 0xcccccc;
     const armorMat = new THREE.MeshStandardMaterial({ color: teamHex, metalness: 0.5, roughness: 0.42 });
     const darkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(teamHex).multiplyScalar(0.45), metalness: 0.55, roughness: 0.4 });
     const trimMat = new THREE.MeshStandardMaterial({ color: teamHex, emissive: teamHex, emissiveIntensity: 0.5, metalness: 0.3, roughness: 0.4 });
@@ -614,7 +617,7 @@ export class Renderer {
       group.add(blob);
     }
     this.scene.add(group);
-    v = { group, body, head, visor, ring, tag, weapon, targetPos: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), targetYaw: p.yaw, team: p.team, seen: true };
+    v = { group, body, head, visor, ring, tag, weapon, targetPos: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), targetYaw: p.yaw, team: p.team, seen: true, infected: !!p.infected, jugg: !!p.isJuggernaut };
     this.players.set(p.id, v);
     return v;
   }
@@ -647,6 +650,12 @@ export class Renderer {
         const v = this.players.get(p.id);
         if (v) v.seen = true;
         continue; // local rendered first-person
+      }
+      // role changed (converted to horde / crowned juggernaut) -> rebuild tinted visual
+      const prev = this.players.get(p.id);
+      if (prev && (prev.infected !== !!p.infected || prev.jugg !== !!p.isJuggernaut)) {
+        this.scene.remove(prev.group);
+        this.players.delete(p.id);
       }
       const v = this.ensurePlayer(p);
       v.seen = true;

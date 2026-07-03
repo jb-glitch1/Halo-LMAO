@@ -191,7 +191,22 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
           handleEnd(snap);
         }
       }
-      renderer.renderFrame(local, dtMs / 1000, now);
+      // death cam: while waiting to respawn, follow your killer third-person
+      // (v1: no wall-clip avoidance — acceptable for a brief spectate)
+      let camView = local;
+      if (snap && !local.alive) {
+        const me = snap.players.find((p) => p.id === localId);
+        const killer = me?.lastAttacker ? snap.players.find((p) => p.id === me.lastAttacker && p.alive) : undefined;
+        if (killer) {
+          camView = {
+            ...local,
+            pos: { x: killer.pos.x + Math.sin(killer.yaw) * 3.2, y: killer.pos.y + 1.7, z: killer.pos.z + Math.cos(killer.yaw) * 3.2 },
+            yaw: killer.yaw,
+            pitch: -0.1,
+          };
+        }
+      }
+      renderer.renderFrame(camView, dtMs / 1000, now);
 
       // fps
       const f = fpsRef.current;
@@ -429,6 +444,9 @@ export default function GameClient({ session, localId, online, isHost, onLeave, 
           }
         : undefined,
       gungame: snap.mode === "gungame" ? { level: self?.gunLevel ?? 0, total: GUN_LADDER.length } : undefined,
+      juggernaut: snap.mode === "juggernaut"
+        ? (() => { const j = snap.players.find((p) => p.isJuggernaut); return { you: j?.id === localId, name: j?.name ?? "nobody" }; })()
+        : undefined,
       damageDir: dmgDir.current && now - dmgDir.current.ts < 1100 ? dmgDir.current.ang : null,
       colorblind: colorblindRef.current,
     };

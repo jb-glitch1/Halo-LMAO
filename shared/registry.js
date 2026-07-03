@@ -4,10 +4,10 @@
 // game/__tests__/sim.test.ts cross-checks these lists against the engine and
 // map registry so client/server can't drift apart again.
 
-const MODE_IDS = ["slayer", "team", "koth", "oddball", "infection", "ctf", "gungame"];
+const MODE_IDS = ["slayer", "team", "koth", "oddball", "infection", "ctf", "gungame", "juggernaut"];
 
 // Modes whose lobby pool is a single FFA group (no red/blue columns).
-const FFA_MODES = ["slayer", "infection", "gungame"];
+const FFA_MODES = ["slayer", "infection", "gungame", "juggernaut"];
 
 const MAP_IDS = ["gulch", "warehouse", "lattice", "aisle", "dock"];
 

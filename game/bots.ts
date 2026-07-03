@@ -310,6 +310,10 @@ export function botThink(e: Engine, bot: PlayerState, now: number) {
 }
 
 function pickWaypoint(e: Engine, bot: PlayerState): Vec3 {
+  // Juggernaut: hunters converge on the crown
+  if (e.config.mode === "juggernaut" && !bot.isJuggernaut) {
+    for (const t of e.players.values()) if (t.alive && t.isJuggernaut) return { ...t.pos };
+  }
   // CTF: go grab the enemy banner, or run a carried banner home
   if (e.config.mode === "ctf" && e.flags && (bot.team === "red" || bot.team === "blue")) {
     const own = bot.team as "red" | "blue";

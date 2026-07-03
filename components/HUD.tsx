@@ -53,6 +53,7 @@ export interface HudModel {
   infection?: { role: "survivor" | "infected"; survivorsLeft: number };
   ctf?: { yourHome: boolean; enemyHome: boolean; youCarry: boolean };
   gungame?: { level: number; total: number };
+  juggernaut?: { you: boolean; name: string };
   damageDir?: number | null; // bearing to last attacker (rad, 0 = ahead), null = hide
   colorblind?: boolean; // shape-code radar blips instead of relying on color
 }
@@ -136,6 +137,15 @@ export default function HUD({ m }: { m: HudModel }) {
         {m.gungame && (
           <div className="panel2 px-3 py-0.5 text-xs">
             <span className="text-temu-gold">🔫 Rung {m.gungame.level + 1}/{m.gungame.total}</span>
+          </div>
+        )}
+        {m.juggernaut && (
+          <div className="panel2 px-3 py-0.5 text-xs">
+            {m.juggernaut.you ? (
+              <span className="text-temu-red">👑 YOU ARE THE JUGGERNAUT — survive and slay</span>
+            ) : (
+              <span className="text-temu-gold">👑 Hunt {m.juggernaut.name} — the bounty pays ×3</span>
+            )}
           </div>
         )}
       </div>
