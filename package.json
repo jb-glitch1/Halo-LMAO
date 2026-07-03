@@ -11,11 +11,11 @@
     "test": "node --import tsx --test game/__tests__/*.test.ts"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "next": "^14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "socket.io": "4.7.5",
-    "socket.io-client": "4.7.5",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "three": "^0.165.0"
   },
   "devDependencies": {
