@@ -1,0 +1,282 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Oswald", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* motion tokens */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.2, 1.4, 0.5, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 400ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #05080a;
+  color: #d8e2ea;
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* keyboard focus ring — cyan = interactive (color doctrine) */
+:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid #36e7ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@layer components {
+  .panel {
+    @apply bg-hud-panel/90 border border-hud-line rounded-xl backdrop-blur-sm;
+  }
+  .panel2 {
+    @apply bg-hud-panel2/90 border border-hud-line rounded-lg;
+  }
+  /* ---- type scale (Oswald display / JetBrains Mono data) ---- */
+  .t-h1 {
+    @apply text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight;
+  }
+  .t-h2 {
+    @apply text-2xl font-bold leading-tight;
+  }
+  .t-h3 {
+    @apply text-lg font-bold;
+  }
+  .t-body {
+    @apply text-sm leading-relaxed text-hud-amber/65;
+  }
+  .t-data {
+    @apply font-mono tabular-nums;
+  }
+  /* ---- diegetic HUD surfaces ---- */
+  /* soft dark backing so HUD clusters stay legible over bright maps */
+  .hud-cluster {
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: radial-gradient(120% 100% at 50% 50%, rgba(3, 6, 9, 0.42), transparent 78%);
+  }
+  .clip-notch {
+    clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-semibold tracking-wide uppercase text-sm select-none cursor-pointer;
+    transition: transform var(--dur-1) var(--ease-out), filter var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out),
+      box-shadow var(--dur-1) var(--ease-out);
+  }
+  .btn-primary {
+    @apply btn bg-gradient-to-b from-temu-orange to-temu-red text-black shadow-glow hover:brightness-110 active:scale-95;
+  }
+  .btn-ghost {
+    @apply btn border border-hud-line text-hud-amber hover:bg-hud-panel2 hover:border-hud-amber/60;
+  }
+  .btn-cyan {
+    @apply btn bg-gradient-to-b from-hud-cyan to-hud-blue text-black hover:brightness-110 active:scale-95;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono uppercase tracking-wider;
+  }
+  .label {
+    @apply text-xs uppercase tracking-[0.2em] text-hud-amber/70 font-mono;
+  }
+  .input {
+    @apply bg-black/40 border border-hud-line rounded-lg px-3 py-2 text-hud-amber outline-none focus:border-hud-amber/70 font-mono;
+  }
+}
+
+/* HUD scanline + vignette overlay */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.06) 3px
+  );
+  mix-blend-mode: multiply;
+}
+.vignette::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.7);
+}
+
+.grid-bg {
+  background-image: linear-gradient(rgba(54, 231, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(54, 231, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.text-glow {
+  text-shadow: 0 0 18px currentColor;
+}
+
+.title-shimmer {
+  background: linear-gradient(90deg, #ff6a00, #ffd23f, #ff3b30, #ff6a00);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* crosshair + hud helpers */
+.no-select {
+  user-select: none;
+}
+.crosshair-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #36e7ff;
+  box-shadow: 0 0 6px #36e7ff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1d3038;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+.fade-in {
+  animation: fadein var(--dur-3) var(--ease-out) both;
+}
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pop {
+  animation: pop var(--dur-2) var(--ease-spring) both;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---- hero / opening screen ---- */
+.hero-twinkle {
+  animation: heroTwinkle 4s ease-in-out infinite;
+}
+@keyframes heroTwinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.hero-title {
+  background: linear-gradient(180deg, #ffffff 0%, #cdeeff 36%, #6fb8e6 62%, #29506e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 46px rgba(54, 231, 255, 0.35);
+  filter: drop-shadow(0 3px 1px rgba(0, 0, 0, 0.45));
+}
+.hero-title-flicker {
+  animation: heroFlicker 7s ease-in-out infinite;
+}
+@keyframes heroFlicker {
+  0%,
+  46%,
+  49%,
+  92%,
+  94%,
+  100% {
+    opacity: 1;
+  }
+  47.5% {
+    opacity: 0.78;
+  }
+  93% {
+    opacity: 0.86;
+  }
+}
+
+.btn-holo {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(54, 231, 255, 0.6);
+  background: linear-gradient(180deg, rgba(54, 231, 255, 0.18), rgba(58, 160, 255, 0.1));
+  color: #d7f6ff;
+  box-shadow: 0 0 22px rgba(54, 231, 255, 0.25), inset 0 0 16px rgba(54, 231, 255, 0.12);
+  text-shadow: 0 0 10px rgba(54, 231, 255, 0.5);
+}
+.btn-holo:hover {
+  border-color: rgba(54, 231, 255, 0.95);
+  box-shadow: 0 0 30px rgba(54, 231, 255, 0.45), inset 0 0 20px rgba(54, 231, 255, 0.2);
+}
+.btn-holo::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.6s ease;
+}
+.btn-holo:hover::after {
+  left: 140%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-twinkle,
+  .hero-title-flicker,
+  .title-shimmer,
+  .animate-spin,
+  .animate-pulse,
+  .pop,
+  .fade-in {
+    animation: none !important;
+  }
+  .btn-holo::after {
+    transition: none;
+  }
+}
