@@ -2,14 +2,24 @@
 // The relay is intentionally dumb: it shuttles lobby state, client inputs, and
 // host snapshots between peers. The host's browser runs the authoritative game.
 
+// Resolve run mode before requiring Next (it reads NODE_ENV at require time).
+// `npm start` passes --prod so the script works on Windows shells too.
+const prod = process.argv.includes("--prod") || process.env.NODE_ENV === "production";
+if (!process.env.NODE_ENV) process.env.NODE_ENV = prod ? "production" : "development";
+
 const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
 const { Server } = require("socket.io");
+const REG = require("./shared/registry");
 
-const dev = process.env.NODE_ENV !== "production";
+const dev = !prod;
 const hostname = process.env.HOST || "0.0.0.0";
-const port = parseInt(process.env.PORT || "3000", 10);
+const port = Number.parseInt(process.env.PORT || "3000", 10);
+if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+  console.error(`Invalid PORT "${process.env.PORT}" — expected an integer 1-65535.`);
+  process.exit(1);
+}
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -17,6 +27,7 @@ const handle = app.getRequestHandler();
 // ---- room state ----
 /** @type {Map<string, any>} */
 const rooms = new Map();
+const MAX_ROOMS = 200; // soft cap so createRoom spam can't grow memory unbounded
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function makeCode() {
@@ -32,18 +43,19 @@ function sanitizeName(n) {
   return String(n || "Spartan").slice(0, 16).replace(/[^\w \-]/g, "") || "Spartan";
 }
 
+const isFfaMode = (m) => REG.FFA_MODES.includes(m);
+
 function defaultConfig(c = {}) {
-  const modes = ["slayer", "team", "koth", "oddball"];
-  const maps = ["gulch", "warehouse", "lattice"];
   return {
-    mode: modes.includes(c.mode) ? c.mode : "team",
-    mapId: maps.includes(c.mapId) ? c.mapId : "gulch",
-    scoreLimit: Math.max(5, Math.min(500, parseInt(c.scoreLimit) || 25)),
+    mode: REG.MODE_IDS.includes(c.mode) ? c.mode : "team",
+    mapId: REG.MAP_IDS.includes(c.mapId) ? c.mapId : "gulch",
+    scoreLimit: Math.max(3, Math.min(500, parseInt(c.scoreLimit) || 25)),
     timeLimitSec: Math.max(60, Math.min(1800, parseInt(c.timeLimitSec) || 420)),
-    botCount: Math.max(0, Math.min(15, parseInt(c.botCount ?? 6))),
+    botCount: Math.max(0, Math.min(REG.MAX_BOTS, parseInt(c.botCount ?? 6))),
     botSkill: Math.max(0, Math.min(1, typeof c.botSkill === "number" ? c.botSkill : 0.6)),
     friendlyFire: !!c.friendlyFire,
     startingLoadout: typeof c.startingLoadout === "string" ? c.startingLoadout : "recruit",
+    skulls: Array.isArray(c.skulls) ? c.skulls.filter((s) => REG.SKULL_IDS.includes(s)).slice(0, REG.SKULL_IDS.length) : undefined,
   };
 }
 
@@ -71,8 +83,9 @@ app.prepare().then(() => {
     }
   });
 
+  // No CORS config: same-origin only. The site and relay share one origin, so
+  // cross-origin browsers (i.e. other websites) can't drive the relay.
   const io = new Server(server, {
-    cors: { origin: "*" },
     pingInterval: 10000,
     pingTimeout: 8000,
   });
@@ -81,11 +94,16 @@ app.prepare().then(() => {
     socket.data.code = null;
 
     socket.on("createRoom", ({ profile, config }, cb) => {
+      if (socket.data.code) leaveRoom(socket, socket.data.code); // one room per socket
+      if (rooms.size >= MAX_ROOMS) {
+        return typeof cb === "function" && cb({ error: "Server is at room capacity. Try again soon." });
+      }
       const code = makeCode();
+      const cfg = defaultConfig(config);
       const player = {
         id: socket.id,
         name: sanitizeName(profile?.name),
-        team: (config?.mode === "slayer" ? "ffa" : "red"),
+        team: isFfaMode(cfg.mode) ? "ffa" : "red",
         ready: false,
         isHost: true,
         loadout: profile?.loadout || "recruit",
@@ -94,7 +112,7 @@ app.prepare().then(() => {
       const room = {
         code,
         hostId: socket.id,
-        config: defaultConfig(config),
+        config: cfg,
         state: "lobby",
         players: new Map([[socket.id, player]]),
       };
@@ -109,14 +127,15 @@ app.prepare().then(() => {
       const room = rooms.get(String(code || "").toUpperCase());
       if (!room) return cb && cb({ error: "Room not found. Check the code." });
       if (room.state !== "lobby") return cb && cb({ error: "That match already started." });
-      if (room.players.size >= 16) return cb && cb({ error: "Room is full (16 max)." });
+      if (room.players.size >= REG.MAX_PLAYERS) return cb && cb({ error: `Room is full (${REG.MAX_PLAYERS} max).` });
+      if (socket.data.code && socket.data.code !== room.code) leaveRoom(socket, socket.data.code);
       // balance team for new joiner
       let red = 0, blue = 0;
       for (const p of room.players.values()) {
         if (p.team === "red") red++;
         else if (p.team === "blue") blue++;
       }
-      const team = room.config.mode === "slayer" ? "ffa" : red <= blue ? "red" : "blue";
+      const team = isFfaMode(room.config.mode) ? "ffa" : red <= blue ? "red" : "blue";
       const player = {
         id: socket.id,
         name: sanitizeName(profile?.name),
@@ -149,8 +168,8 @@ app.prepare().then(() => {
       const room = rooms.get(code);
       if (!room || room.hostId !== socket.id) return;
       room.config = defaultConfig({ ...room.config, ...patch });
-      // if switching to/from slayer, fix team assignments
-      if (room.config.mode === "slayer") {
+      // fix team assignments when switching between team-pool and ffa-pool modes
+      if (isFfaMode(room.config.mode)) {
         for (const p of room.players.values()) p.team = "ffa";
       } else {
         let red = 0, blue = 0;
@@ -186,10 +205,10 @@ app.prepare().then(() => {
       broadcastLobby(io, room);
     });
 
-    // ---- in-match relay ----
+    // ---- in-match relay (members only) ----
     socket.on("input", ({ code, input }) => {
       const room = rooms.get(code);
-      if (!room) return;
+      if (!room || !room.players.has(socket.id)) return;
       io.to(room.hostId).emit("clientInput", { id: socket.id, input });
     });
 
@@ -203,9 +222,10 @@ app.prepare().then(() => {
       const room = rooms.get(code);
       if (!room) return;
       const p = room.players.get(socket.id);
+      if (!p) return;
       io.to(room.code).emit("chat", {
         from: socket.id,
-        name: p ? p.name : "???",
+        name: p.name,
         text: String(text || "").slice(0, 160),
       });
     });

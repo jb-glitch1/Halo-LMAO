@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine, GUN_LADDER } from "../engine";
 import "../bots"; // side-effect: registers the bot brain with the engine
-import { MAP_LIST, generateMap, registerMap } from "../maps";
+import { MAPS, MAP_LIST, generateMap, registerMap } from "../maps";
+import REG from "../../shared/registry.js";
 import { WEAPONS, LOADOUTS, weaponDef } from "../weapons";
 import { raycastWorld } from "../physics";
 import { v3, dirFromAngles } from "../vec";
@@ -56,6 +57,26 @@ function liveEngine(c = cfg(), ids = ["a", "b"]): Engine {
   e.step(1 / 60, 4000); // warmup is 3200ms, spawn protect 1800ms → fully live
   return e;
 }
+
+test("shared registry stays in sync with the engine and map registry", () => {
+  // every registry mode is a real engine mode (has a mode name + boots)
+  for (const mode of REG.MODE_IDS as any[]) {
+    const e = new Engine(cfg({ mode }));
+    e.addPlayer("a", { name: "a", team: "ffa", isBot: false });
+    e.start(0);
+    assert.ok(e.modeName(), `mode ${mode} is known to the engine`);
+  }
+  for (const f of REG.FFA_MODES) assert.ok(REG.MODE_IDS.includes(f), `${f} listed as a mode`);
+  // registry maps === hand-built maps (ignoring runtime-generated gen_ arenas)
+  const handBuilt = Object.keys(MAPS).filter((k) => !k.startsWith("gen_")).sort();
+  assert.deepEqual([...REG.MAP_IDS].sort(), handBuilt, "server map whitelist matches game/maps.ts");
+});
+
+test("engine ignores inputs for unknown player ids", () => {
+  const e = liveEngine();
+  e.setInput("total-stranger", input({ fire: true }));
+  assert.equal(e.inputs.has("total-stranger"), false);
+});
 
 test("players spawn alive and the snapshot is well-shaped", () => {
   const e = liveEngine();

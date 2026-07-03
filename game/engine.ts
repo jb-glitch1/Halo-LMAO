@@ -301,6 +301,7 @@ export class Engine {
   }
 
   setInput(id: string, input: PlayerInput) {
+    if (!this.players.has(id)) return; // ignore inputs for unknown ids (relay strangers)
     const cur = this.inputs.get(id);
     if (cur) this.prevInputs.set(id, cur);
     this.inputs.set(id, input);

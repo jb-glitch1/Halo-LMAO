@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "node server.js --prod",
     "lint": "next lint",
     "test": "node --import tsx --test game/__tests__/*.test.ts"
   },
