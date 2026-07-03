@@ -144,6 +144,61 @@ test("thrifty skull removes shields at spawn", () => {
   assert.equal(p.shield, 0);
 });
 
+test("koth: lone team holder scores exactly once per tick; contested hill scores nobody", () => {
+  const e = new Engine(cfg({ mode: "koth", scoreLimit: 999 }));
+  e.addPlayer("r", { name: "r", team: "red", isBot: false });
+  e.addPlayer("b", { name: "b", team: "blue", isBot: false });
+  e.start(0);
+  e.step(1 / 60, 4000);
+  const r = e.players.get("r")!;
+  const b = e.players.get("b")!;
+  r.pos = { ...e.hillPos };
+  b.pos = { x: e.hillPos.x + 30, y: 0, z: e.hillPos.z + 20 };
+  for (let i = 0; i < 60; i++) e.stepMode(1 / 60, 4000);
+  assert.ok(Math.abs(r.score - 1) < 0.02, `lone holder scored once, not double (got ${r.score})`);
+  assert.ok(Math.abs(e.teamScore.red - 1) < 0.02, "team score accrues at the same rate");
+  const before = r.score;
+  b.pos = { ...e.hillPos }; // both teams inside -> contested
+  for (let i = 0; i < 30; i++) e.stepMode(1 / 60, 4000);
+  assert.equal(r.score, before, "contested hill scores nobody");
+  assert.equal(e.hillController, null);
+});
+
+test("koth FFA: co-occupants contest the hill; only a lone occupant scores", () => {
+  const e = liveEngine(cfg({ mode: "koth", scoreLimit: 999 })); // non-team mode -> both players ffa
+  const a = e.players.get("a")!;
+  const b = e.players.get("b")!;
+  a.pos = { ...e.hillPos };
+  b.pos = { ...e.hillPos };
+  for (let i = 0; i < 30; i++) e.stepMode(1 / 60, 4000);
+  assert.equal(a.score + b.score, 0, "two FFA players in the hill = contested, no score");
+  b.pos = { x: e.hillPos.x + 30, y: 0, z: e.hillPos.z };
+  for (let i = 0; i < 60; i++) e.stepMode(1 / 60, 4000);
+  assert.ok(Math.abs(a.score - 1) < 0.02, `lone FFA holder scores (got ${a.score})`);
+});
+
+test("splatter after the driver bails is credited to that driver, not booked as suicide", () => {
+  const e = liveEngine(cfg({ mapId: "gulch" }), ["drv", "victim"]);
+  const drv = e.players.get("drv")!;
+  const victim = e.players.get("victim")!;
+  const cart = e.vehicles[0];
+  drv.pos = { ...cart.pos };
+  e.handleVehicleEntry(drv, input({ pickup: true }), input(), 4000);
+  e.setInput("drv", input({ moveZ: 1 }));
+  for (let i = 0; i < 40; i++) e.stepVehicles(1 / 60, 4000 + i * 16);
+  e.handleVehicleEntry(drv, input({ pickup: true }), input(), 4700); // bail at speed
+  assert.equal(cart.driver, null, "driver bailed");
+  const sp = Math.hypot(cart.vel.x, cart.vel.z);
+  assert.ok(sp > C.VEHICLE_SPLATTER_SPEED, "cart still coasting above splatter speed");
+  victim.pos = { x: cart.pos.x + (cart.vel.x / sp) * 1.2, y: cart.pos.y, z: cart.pos.z + (cart.vel.z / sp) * 1.2 };
+  victim.spawnProtectUntil = 0;
+  const vScore = victim.score;
+  e.stepVehicles(1 / 60, 4710);
+  assert.equal(victim.alive, false, "victim splattered by the coasting cart");
+  assert.equal(drv.kills, 1, "kill credited to the recent driver");
+  assert.equal(victim.score, vScore, "victim not penalized as a suicide");
+});
+
 test("wartrolley: board it, drive it, and splatter someone", () => {
   const e = liveEngine(cfg({ mapId: "gulch" }), ["drv", "victim"]);
   const drv = e.players.get("drv")!;

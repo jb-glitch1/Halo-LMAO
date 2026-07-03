@@ -85,6 +85,10 @@ export interface VehicleState {
   gunner: string | null;
   health: number;
   fireReadyAt: number;
+  // most recent driver (kept briefly after bailing so coasting-cart splatters
+  // are attributed to them instead of being booked as victim suicides)
+  lastDriver?: string | null;
+  lastDriverAt?: number;
 }
 
 export type WeaponType = "hitscan" | "projectile" | "melee";

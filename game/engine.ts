@@ -1372,6 +1372,7 @@ export class Engine {
       p.vehicleSeat = "gunner";
     }
     p.vehicleId = best.id;
+    p.zoomed = false; // riders skip handleWeapons, so don't freeze a stale zoom
   }
 
   stepVehicles(dt: number, now: number) {
@@ -1383,6 +1384,10 @@ export class Engine {
       if (v.gunner && (!gCheck || !gCheck.alive || gCheck.vehicleId !== v.id)) v.gunner = null;
 
       const drv = v.driver ? this.players.get(v.driver) || null : null;
+      if (drv) {
+        v.lastDriver = drv.id;
+        v.lastDriverAt = now;
+      }
 
       // ---- drive ----
       const fwd = flatForward(v.yaw);
@@ -1428,9 +1433,12 @@ export class Engine {
           const dx = t.pos.x - v.pos.x;
           const dz = t.pos.z - v.pos.z;
           if (dx * dx + dz * dz < reach) {
-            if (drv && !this.isEnemy(drv, t) && !this.config.friendlyFire) continue;
-            this.pushFx("splatter", vadd(t.pos, v3(0, 0.8, 0)), drv?.team);
-            this.applyDamage(t, 9999, drv || undefined, "splatter", false, now);
+            // credit a recently-bailed driver so coasting-cart kills aren't suicides
+            const attacker =
+              drv ?? (v.lastDriver && now - (v.lastDriverAt ?? 0) < 4000 ? this.players.get(v.lastDriver) : undefined);
+            if (attacker && !this.isEnemy(attacker, t) && !this.config.friendlyFire) continue;
+            this.pushFx("splatter", vadd(t.pos, v3(0, 0.8, 0)), attacker?.team);
+            this.applyDamage(t, 9999, attacker ?? undefined, "splatter", false, now);
           }
         }
       }
@@ -1493,35 +1501,32 @@ export class Engine {
         }
       }
       let controller: Team | null = null;
-      if (this.config.mode === "koth") {
-        if (occupants.length) {
-          if (this.config.friendlyFire || true) {
-            // team koth: a team controls if it's the only team present
-            const teams = new Set(occupants.map((o) => o.team));
-            if (teams.size === 1) controller = occupants[0].team;
-          }
+      if (this.config.mode === "koth" && occupants.length) {
+        const teams = new Set(occupants.map((o) => o.team));
+        if (teams.size === 1) {
+          const t = occupants[0].team;
+          // a team controls the hill when it's the only team present; in FFA
+          // only a LONE occupant controls it (two ffa players = contested)
+          if (t === "red" || t === "blue") controller = t;
+          else if (occupants.length === 1) controller = "ffa";
         }
       }
       this.hillController = controller;
       if (controller) {
         if (controller === "red" || controller === "blue") {
           this.teamScore[controller] += dt;
+          for (const o of occupants) if (o.team === controller) o.score += dt;
+          if (Math.max(this.teamScore.red, this.teamScore.blue) >= this.config.scoreLimit) {
+            this.endMatch("score");
+          }
+        } else {
+          // lone FFA holder scores individually
+          occupants[0].score += dt;
+          if (occupants[0].score >= this.config.scoreLimit) this.endMatch("score");
         }
-        for (const o of occupants) if (o.team === controller) o.score += dt;
         this.hillProgress = Math.min(1, this.hillProgress + dt * 0.2);
-        if (Math.max(this.teamScore.red, this.teamScore.blue) >= this.config.scoreLimit) {
-          this.endMatch("score");
-        }
-        // FFA koth: top occupant scores
-        if (controller === "ffa") {
-        }
       } else {
         this.hillProgress = Math.max(0, this.hillProgress - dt * 0.1);
-      }
-      // ffa koth handled by per-player score above when single player in zone
-      if (this.config.mode === "koth" && occupants.length === 1) {
-        occupants[0].score += dt;
-        if (occupants[0].score >= this.config.scoreLimit) this.endMatch("score");
       }
     }
 
